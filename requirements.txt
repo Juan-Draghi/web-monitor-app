@@ -1,0 +1,6 @@
+streamlit
+playwright==1.44.0
+pandas
+beautifulsoup4
+nest_asyncio
+huggingface_hub
