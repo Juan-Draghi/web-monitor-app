@@ -1,6 +1,6 @@
-streamlit
-playwright==1.44.0
-pandas
-beautifulsoup4
-nest_asyncio
-huggingface_hub
+streamlit==1.54.0
+playwright==1.58.0
+pandas==2.3.3
+beautifulsoup4==4.14.3
+huggingface_hub==1.4.1
+requests==2.32.5

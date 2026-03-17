@@ -3,21 +3,40 @@ import asyncio
 import hashlib
 import json
 import os
+from functools import lru_cache
 from playwright.async_api import async_playwright
 import pandas as pd
 from datetime import datetime
-import nest_asyncio
 from huggingface_hub import HfApi, hf_hub_download
 import requests
 from bs4 import BeautifulSoup
-
-# Apply nest_asyncio to allow nested event loops (crucial for Streamlit/Colab)
-nest_asyncio.apply()
 
 # Playwright browsers are now installed via Dockerfile at build time.
 # No runtime installation needed.
 
 # --- Helper Functions ---
+
+DEFAULT_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
+PLAYWRIGHT_LAUNCH_ARGS = [
+    "--disable-blink-features=AutomationControlled",
+    "--disable-dev-shm-usage",
+    "--no-sandbox",
+]
+REQUEST_HEADERS = {
+    "User-Agent": DEFAULT_USER_AGENT,
+    "Accept-Language": "es-419,es;q=0.9",
+}
+
+
+def get_env_int(key, default, minimum=1):
+    """Read a positive integer env var with a safe fallback."""
+    try:
+        return max(minimum, int(os.getenv(key, str(default))))
+    except (TypeError, ValueError):
+        return default
 
 def get_secret(key):
     """Retrieves secret from Streamlit secrets or Environment Variables (for Docker)."""
@@ -38,6 +57,20 @@ def load_urls():
 
 URLS_A_MONITOREAR = load_urls()
 HASH_FILENAME = "web_monitoring_hashes.json"
+REQUEST_TIMEOUT = get_env_int("REQUEST_TIMEOUT", 30)
+PAGE_GOTO_TIMEOUT_MS = get_env_int("PAGE_GOTO_TIMEOUT_MS", 45000)
+PAGE_IDLE_TIMEOUT_MS = get_env_int("PAGE_IDLE_TIMEOUT_MS", 3000)
+PAGE_TEXT_TIMEOUT_MS = get_env_int("PAGE_TEXT_TIMEOUT_MS", 5000)
+BATCH_SIZE = get_env_int("BATCH_SIZE", 1)
+MAX_RETRIES = get_env_int("MAX_RETRIES", 2)
+
+
+@lru_cache(maxsize=1)
+def get_requests_session():
+    """Reuse HTTP connections across requests to reduce startup overhead."""
+    session = requests.Session()
+    session.headers.update(REQUEST_HEADERS)
+    return session
 
 def get_hf_api():
     """Returns HF Api instance if secrets are configured."""
@@ -46,6 +79,7 @@ def get_hf_api():
         return HfApi(token=token)
     return None
 
+@lru_cache(maxsize=1)
 def load_hashes():
     """Loads hashes from HF Dataset (preferred) or local file."""
     dataset_id = get_secret("DATASET_ID")
@@ -82,6 +116,7 @@ def save_hashes(hashes):
     # Upload to HF Hub
     dataset_id = get_secret("DATASET_ID")
     api = get_hf_api()
+    load_hashes.cache_clear()
     
     if dataset_id and api:
         try:
@@ -135,10 +170,7 @@ def find_latest_zonaprop_pdf(pdf_pattern):
     """
     import urllib3
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
+    session = get_requests_session()
     
     now = datetime.now()
     base_url = "https://www.zonaprop.com.ar/blog/wp-content/uploads"
@@ -173,7 +205,7 @@ def find_latest_zonaprop_pdf(pdf_pattern):
         filename = pdf_pattern.format(year=rep_year, month=rep_month)
         pdf_url = f"{base_url}/{upload_year}/{upload_month:02d}/{filename}"
         try:
-            r = requests.head(pdf_url, headers=headers, timeout=10, verify=False)
+            r = session.head(pdf_url, timeout=10, verify=False, allow_redirects=True)
             if r.status_code == 200:
                 return pdf_url
         except Exception:
@@ -181,7 +213,52 @@ def find_latest_zonaprop_pdf(pdf_pattern):
     
     return None
 
-async def fetch_url(playwright, url):
+def fetch_gdrive_folder(url):
+    """Fetches a public Google Drive folder page and extracts the list of filenames.
+    
+    Google Drive embeds file metadata (names, dates) in the HTML of public folder pages
+    using HTML-encoded JSON (&quot; for quotes). Returns a sorted, newline-separated
+    string of filenames — when new files appear the hash will change.
+    """
+    import re
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    session = get_requests_session()
+    
+    try:
+        response = session.get(url, timeout=REQUEST_TIMEOUT, verify=False)
+        if response.status_code != 200:
+            return None, f"HTTP {response.status_code}"
+        
+        html = response.text
+        
+        # Google Drive embeds filenames as &quot;filename.ext&quot; in the HTML
+        pattern = r'(?:quot;|\\x22)([^\\<>&"]+\.(?:pdf|pptx?|xlsx?|docx?))(?:quot;|\\x22)'
+        matches = re.findall(pattern, html, re.IGNORECASE)
+        
+        if not matches:
+            return None, "No se encontraron archivos en el HTML de la carpeta"
+        
+        # Deduplicate and sort (naturally sorts by name, newest months sort last)
+        unique_files = sorted(set(matches))
+        content = "\n".join(unique_files)
+        return content, ""
+        
+    except Exception as e:
+        return None, str(e)
+
+async def fetch_with_requests(url):
+    """Fetches static content with a shared requests session."""
+    session = get_requests_session()
+    loop = asyncio.get_running_loop()
+    response = await loop.run_in_executor(
+        None,
+        lambda: session.get(url, timeout=REQUEST_TIMEOUT, verify=False),
+    )
+    return response
+
+
+async def fetch_url(browser, url):
     """Fetches key content from a URL using Requests (Static) or Playwright (Dynamic)."""
     content = ""
     status = "Error"
@@ -195,14 +272,9 @@ async def fetch_url(playwright, url):
             # Suppress SSL warnings
             import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-            
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            }
-            # Run blocking requests in default executor
-            loop = asyncio.get_running_loop()
+
             # Disable SSL verify as it often causes hang-ups on misconfigured servers/Wix
-            response = await loop.run_in_executor(None, lambda: requests.get(url, headers=headers, timeout=60, verify=False))
+            response = await fetch_with_requests(url)
             
             if response.status_code == 200:
                 # Use BS4 to parse
@@ -234,18 +306,13 @@ async def fetch_url(playwright, url):
             return url, "Error", "", "No se encontró PDF reciente (últimos 3 meses probados)"
 
     # 3. STANDARD CASE: Playwright (Other URLs)
-    for attempt in range(3): # Try up to 3 times
-        browser = None
+    for attempt in range(MAX_RETRIES):
         context = None
+        page = None
         try:
-            browser = await playwright.chromium.launch(
-                headless=True,
-                args=['--disable-blink-features=AutomationControlled']
-            )
-            
             # Setup context with better headers for bot evasion
             context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                user_agent=DEFAULT_USER_AGENT,
                 viewport={"width": 1920, "height": 1080},
                 device_scale_factor=1,
                 extra_http_headers={
@@ -256,16 +323,18 @@ async def fetch_url(playwright, url):
             )
             
             page = await context.new_page()
+            page.set_default_navigation_timeout(PAGE_GOTO_TIMEOUT_MS)
+            page.set_default_timeout(PAGE_TEXT_TIMEOUT_MS)
             
             # Standard Logic
             try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=60000)
-            except:
+                await page.goto(url, wait_until="domcontentloaded")
+            except Exception:
                 print(f"Timeout loading {url}, attempting capture anyway...")
             
             try:
-                await page.wait_for_load_state("networkidle", timeout=5000)
-            except:
+                await page.wait_for_load_state("networkidle", timeout=PAGE_IDLE_TIMEOUT_MS)
+            except Exception:
                 pass 
             content = await page.inner_text("body")
 
@@ -282,12 +351,16 @@ async def fetch_url(playwright, url):
             print(f"Attempt {attempt+1} failed for {url}: {e}")
             
         finally:
+            if page:
+                try:
+                    await page.close()
+                except Exception:
+                    pass
             if context:
-                try: await context.close()
-                except: pass
-            if browser:
-                try: await browser.close()
-                except: pass
+                try:
+                    await context.close()
+                except Exception:
+                    pass
                 
     return url, status, content, error_msg
 
@@ -295,20 +368,29 @@ async def process_urls(urls, progress_bar, status_text):
     """Runs Playwright to fetch all URLs with progress tracking."""
     results = []
     total = len(urls)
+    if total == 0:
+        progress_bar.progress(1.0)
+        status_text.text("No hay URLs configuradas.")
+        return results
     
     async with async_playwright() as p:
-        batch_size = 5
-        for i in range(0, total, batch_size):
-            batch = urls[i:i + batch_size]
-            
-            # Update status
-            current_progress = i / total
-            progress_bar.progress(current_progress)
-            status_text.text(f"Procesando lote {i//batch_size + 1}... ({i}/{total})")
-            
-            tasks = [fetch_url(p, url) for url in batch]
-            batch_results = await asyncio.gather(*tasks)
-            results.extend(batch_results)
+        browser = await p.chromium.launch(headless=True, args=PLAYWRIGHT_LAUNCH_ARGS)
+        try:
+            # Keep concurrency modest to avoid exhausting resources on small Spaces.
+            batch_size = BATCH_SIZE
+            for i in range(0, total, batch_size):
+                batch = urls[i:i + batch_size]
+                
+                # Update status
+                current_progress = i / total
+                progress_bar.progress(current_progress)
+                status_text.text(f"Procesando lote {i//batch_size + 1}... ({i}/{total})")
+                
+                tasks = [fetch_url(browser, url) for url in batch]
+                batch_results = await asyncio.gather(*tasks)
+                results.extend(batch_results)
+        finally:
+            await browser.close()
             
     progress_bar.progress(1.0)
     status_text.text("¡Completado!")
@@ -327,6 +409,9 @@ else:
     st.sidebar.warning("⚠️ Persistencia no configurada (Faltan Secretos)")
 
 st.sidebar.header("Configuración")
+st.sidebar.caption(f"Lotes simultaneos: {BATCH_SIZE} | Reintentos por URL: {MAX_RETRIES}")
+
+st.sidebar.caption(f"Timeout request: {REQUEST_TIMEOUT}s | goto: {PAGE_GOTO_TIMEOUT_MS//1000}s")
 
 # --- Diagnostics ---
 with st.sidebar.expander("🛠️ Diagnóstico", expanded=False):
@@ -367,7 +452,7 @@ with st.sidebar.expander("🛠️ Diagnóstico", expanded=False):
     st.write("---")
     st.write("Variables de Entorno Disponibles (Keys):")
     # Filter to avoid showing sensitive system vars, or just show keys
-    env_keys = [k for k in os.environ.keys()]
+    env_keys = sorted(k for k in os.environ.keys() if "TOKEN" not in k and "SECRET" not in k)
     st.code(env_keys)
 
 force_refresh = st.sidebar.button("Ejecutar Monitoreo Ahora")
@@ -465,8 +550,8 @@ if st.session_state["last_results"]:
     st.subheader(f"🚨 Sitios con Cambios ({len(df_changes)})")
     if not df_changes.empty:
         st.dataframe(
-            df_changes.style.applymap(color_status, subset=['Resultado']),
-            use_container_width=True,
+            df_changes.style.map(color_status, subset=['Resultado']),
+            width="stretch",
             column_config={
                 "URL": st.column_config.LinkColumn("Sitio Web"),
                 "Error": st.column_config.TextColumn("Detalle Error", width="medium")
@@ -480,7 +565,7 @@ if st.session_state["last_results"]:
         st.subheader(f"⚠️ Errores de Lectura ({len(df_errors)})")
         st.dataframe(
             df_errors,
-            use_container_width=True,
+            width="stretch",
             column_config={
                 "URL": st.column_config.LinkColumn("Sitio Web"),
                 "Error": st.column_config.TextColumn("Detalle Error", width="medium")
@@ -492,7 +577,7 @@ if st.session_state["last_results"]:
         if not df_no_changes.empty:
             st.dataframe(
                 df_no_changes,
-                use_container_width=True,
+                width="stretch",
                 column_config={
                     "URL": st.column_config.LinkColumn("Sitio Web"),
                     "Error": st.column_config.TextColumn("Detalle Error", width="medium")
