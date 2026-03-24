@@ -106,7 +106,7 @@ web-monitor-app/
 `-- README.md
 ```
 
-## Redisenio en curso
+## Rediseño en curso
 
 El proyecto tiene un replanteo documentado en:
 
