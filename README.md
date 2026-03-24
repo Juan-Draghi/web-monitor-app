@@ -1,76 +1,146 @@
-# 🕵️ Web Monitor App
+# Web Monitor App
 
-Aplicación de monitoreo automático de sitios web desplegada en [Hugging Face Spaces](https://huggingface.co/spaces). Detecta cambios en el contenido de páginas de interés del mercado inmobiliario argentino y notifica visualmente cuando algo nuevo aparece.
+Aplicacion de monitoreo de sitios web orientada a detectar cambios en paginas del mercado inmobiliario argentino. La interfaz esta hecha con Streamlit y el scraping combina `requests`, `BeautifulSoup` y casos especiales por dominio. El proyecto esta preparado para correr en Hugging Face Spaces como `Docker Space`.
 
-## ¿Qué hace?
+## Estado actual
 
-- **Monitorea una lista de URLs** definida en `urls.txt`
-- **Detecta cambios** comparando un hash del contenido actual con el de la última verificación
-- **Persiste el estado** entre ejecuciones usando un Hugging Face Dataset privado
-- **Muestra los resultados** en una interfaz web construida con Streamlit, agrupados en: cambios detectados, errores y sitios sin cambios
+- La app monitorea las URLs definidas en `urls.txt`.
+- El estado se persiste en un Hugging Face Dataset usando `web_monitoring_hashes.json`.
+- Existe un recordatorio de revision manual cada 15 dias para sitios con falsos positivos recurrentes.
+- La carpeta publica de Google Drive de la Universidad de San Andres ya esta integrada al monitoreo automatico.
 
-## Estrategias de scraping
+## Desarrollo
 
-La app adapta su método de extracción según el tipo de sitio:
+Este proyecto fue desarrollado por Juan Draghi con asistencia de IA para programacion. La implementacion, refactorizacion y documentacion se trabajaron con ayuda de Codex / OpenAI, por lo que el repositorio no busca dar la impresion de ser un desarrollo hecho de forma completamente manual desde cero.
 
-### 1. Zonaprop (`zonaprop.com.ar`)
-Las páginas del blog de Zonaprop están protegidas por Cloudflare, por lo que se usa un enfoque alternativo: se hacen **HEAD requests directos** a los PDFs mensuales publicados en `wp-content/uploads`, que no tienen esa restricción. El monitor prueba automáticamente combinaciones de mes/año para encontrar el informe más reciente. El contenido monitoreado es la URL del PDF; cuando Zonaprop publica un nuevo informe mensual, la URL cambia y se detecta como cambio.
+## Estrategias de monitoreo
 
-### 2. AFCP (`afcp.org.ar`)
-Este sitio funciona con contenido estático. Se usa `requests` + `BeautifulSoup` para obtener el texto de la página, evitando la sobrecarga de un browser completo.
+La app no usa una unica tecnica para todos los sitios.
 
-### 3. Resto de sitios
-Se usa **Playwright** (browser headless Chromium) para renderizar páginas con contenido dinámico generado por JavaScript.
+### 1. Sitios estaticos
 
-## Stack tecnológico
+Se procesan con `requests + BeautifulSoup`. Hoy este camino se usa en particular para dominios como:
 
-| Componente | Tecnología |
-|---|---|
-| UI | [Streamlit](https://streamlit.io/) |
-| Scraping dinámico | [Playwright](https://playwright.dev/python/) |
-| Scraping estático | [requests](https://requests.readthedocs.io/) + [BeautifulSoup4](https://www.crummy.com/software/BeautifulSoup/) |
-| Persistencia | [Hugging Face Datasets](https://huggingface.co/docs/datasets/) |
-| Deploy | [Hugging Face Spaces](https://huggingface.co/spaces) (Docker SDK) |
+- `afcp.org.ar`
+- `uade.edu.ar`
+
+### 2. Zonaprop
+
+Las URLs de `zonaprop.com.ar/blog/zpindex/...` no se scrapean como pagina HTML. La app busca directamente el PDF mensual mas reciente publicado en `wp-content/uploads` y monitorea esa URL.
+
+### 3. Google Drive publico
+
+La carpeta publica de Google Drive de la Universidad de San Andres se monitorea como caso especial. La app extrae del HTML de la carpeta:
+
+- nombre de archivo
+- fecha modificada visible
+
+La deteccion de cambios se basa en una firma estable de las publicaciones mas recientes.
+
+### 4. Sitios dinamicos o problemáticos
+
+El resto de las URLs puede pasar por Playwright cuando hace falta, aunque el proyecto esta en proceso de redisenio para reducir ese uso al minimo posible.
+
+## Sitios excluidos del monitoreo automatico
+
+Estos sitios daban falsos positivos frecuentes con Playwright y quedaron fuera del scraping automatico. Se revisan manualmente cada 15 dias desde la propia app:
+
+- `https://adrianmercadorealestate.com/blog/informes`
+- `https://www.colliers.com/es-ar`
+- `https://www.fabianachaval.com/blog`
+- `https://www.ljramos.com.ar/informes-del-mercado-inmobiliario`
+- `https://www.cbre.com.ar/insights#market-reports`
+
+La fecha de esa revision manual se guarda en `manual_review_schedule.json`.
+
+## Persistencia
+
+La app usa el mismo `DATASET_ID` para guardar dos archivos JSON:
+
+- `web_monitoring_hashes.json`
+  Guarda el ultimo hash conocido por URL.
+- `manual_review_schedule.json`
+  Guarda la ultima fecha de revision manual de los sitios excluidos.
+
+No hace falta configurar datasets separados.
+
+## Configuracion en Hugging Face Spaces
+
+Configurar estos secrets:
+
+- `HF_TOKEN`
+- `DATASET_ID`
+
+Sin esos secrets la app igual funciona, pero el estado no persiste entre reinicios.
+
+## Variables de entorno opcionales
+
+- `BATCH_SIZE`
+- `MAX_RETRIES`
+- `REQUEST_TIMEOUT`
+- `PAGE_GOTO_TIMEOUT_MS`
+- `PAGE_IDLE_TIMEOUT_MS`
+- `PAGE_TEXT_TIMEOUT_MS`
+
+Valores conservadores recomendados para Hugging Face Spaces:
+
+```text
+BATCH_SIZE=1
+MAX_RETRIES=2
+REQUEST_TIMEOUT=30
+PAGE_GOTO_TIMEOUT_MS=45000
+PAGE_IDLE_TIMEOUT_MS=3000
+PAGE_TEXT_TIMEOUT_MS=5000
+```
 
 ## Estructura del proyecto
 
+```text
+web-monitor-app/
+|-- app.py
+|-- urls.txt
+|-- Dockerfile
+|-- requirements.txt
+|-- packages.txt
+|-- redesign/
+`-- README.md
 ```
-web_monitor_app/
-├── app.py              # Aplicación principal
-├── urls.txt            # Lista de URLs a monitorear (una por línea)
-├── Dockerfile          # Configuración del entorno Docker para HF Spaces
-├── requirements.txt    # Dependencias de Python
-├── packages.txt        # Dependencias del sistema (para Playwright)
-└── README.md
+
+## Redisenio en curso
+
+El proyecto tiene un replanteo documentado en:
+
+- `redesign/README.md`
+- `redesign/url_strategy_matrix.csv`
+
+La direccion propuesta es pasar de "Playwright para casi todo" a una estrategia por tipo de sitio:
+
+- `requests` primero
+- parseo estructurado de listados
+- casos especiales por dominio
+- Playwright solo donde sea realmente necesario
+
+## Ejecucion local
+
+Instalar dependencias:
+
+```powershell
+python -m pip install -r requirements.txt
 ```
 
-## Configuración (Secrets)
+Ejecutar Streamlit:
 
-Para que el estado persista entre reinicios, configurar los siguientes secretos en Hugging Face Spaces:
+```powershell
+python -m streamlit run app.py --server.address 127.0.0.1 --server.port 7860
+```
 
-| Secret | Descripción |
-|---|---|
-| `HF_TOKEN` | Token de Hugging Face con permisos de escritura |
-| `DATASET_ID` | ID del dataset donde se guardan los hashes (ej. `usuario/web-monitor-hashes`) |
+## Limitaciones conocidas
 
-Sin estos secretos la app funciona igual, pero los hashes se pierden al reiniciar el Space.
+- Hugging Face Spaces free puede resultar inestable para scraping pesado con Playwright.
+- Algunos sitios cambian protecciones anti-bot y pueden requerir ajustes de estrategia.
+- El siguiente paso arquitectonico probable es separar scraping y dashboard.
 
-## Uso
+## Archivos relevantes
 
-1. Acceder al Space en Hugging Face
-2. Presionar **"Ejecutar Monitoreo Ahora"** en el sidebar
-3. Esperar a que se procesen todas las URLs
-4. Revisar los resultados:
-   - 🔴 **CAMBIO DETECTADO** — el contenido del sitio cambió desde la última verificación
-   - 🟢 **Sin Cambios** — sin novedades
-   - ⚠️ **Error de Lectura** — no se pudo acceder al sitio
-
-## Agregar o quitar URLs
-
-Editar el archivo `urls.txt`: una URL por línea. Las URLs de Zonaprop (`zonaprop.com.ar/blog/zpindex/...`) tienen soporte especial para detección de PDFs mensuales.
-
----
-
-## Créditos
-
-Desarrollado con la asistencia de [Antigravity](https://antigravity.dev/), un agente de IA para programación de Google DeepMind.
+- `urls.txt`: lista definitiva de URLs monitoreadas
+- `redesign/`: base documental del redisenio de estrategia
