@@ -100,6 +100,7 @@ REQUEST_TIMEOUT = get_env_int("REQUEST_TIMEOUT", 30)
 PAGE_GOTO_TIMEOUT_MS = get_env_int("PAGE_GOTO_TIMEOUT_MS", 45000)
 PAGE_IDLE_TIMEOUT_MS = get_env_int("PAGE_IDLE_TIMEOUT_MS", 3000)
 PAGE_TEXT_TIMEOUT_MS = get_env_int("PAGE_TEXT_TIMEOUT_MS", 5000)
+REQUEST_TEXT_MIN_CHARS = get_env_int("REQUEST_TEXT_MIN_CHARS", 80)
 BATCH_SIZE = get_env_int("BATCH_SIZE", 1)
 MAX_RETRIES = get_env_int("MAX_RETRIES", 2)
 
@@ -447,61 +448,36 @@ async def fetch_with_requests(url):
     return response
 
 
-async def fetch_url(browser, url):
-    """Fetches key content from a URL using Requests (Static) or Playwright (Dynamic)."""
+def extract_visible_text(html_content):
+    """Extract visible text from HTML for hash comparison."""
+    if not html_content:
+        return ""
+    soup = BeautifulSoup(html_content, "html.parser")
+    return soup.get_text(separator=" ", strip=True)
+
+
+async def fetch_text_with_requests(url):
+    """Try to fetch a page via requests and return visible text."""
+    import urllib3
+
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    response = await fetch_with_requests(url)
+    if response.status_code != 200:
+        return None, f"HTTP Error {response.status_code}"
+
+    content = extract_visible_text(response.text)
+    if len(content) < REQUEST_TEXT_MIN_CHARS:
+        return None, "Contenido insuficiente (Requests)"
+
+    return content, ""
+
+
+async def fetch_with_playwright(browser, url):
+    """Fallback fetch for pages that requests could not read reliably."""
     content = ""
     status = "Error"
     error_msg = ""
-    
-    # 1. SPECIAL CASE: AFCP (Static/Requests preferred by user)
-    # The user confirmed BeautifulSoup works, which implies standard HTTP get is enough.
-    # We use requests to avoid browser overhead/timeouts for this specific site.
-    if should_use_requests(url):
-        try:
-            # Suppress SSL warnings
-            import urllib3
-            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-            # Disable SSL verify as it often causes hang-ups on misconfigured servers/Wix
-            response = await fetch_with_requests(url)
-            
-            if response.status_code == 200:
-                # Use BS4 to parse
-                soup = BeautifulSoup(response.text, 'html.parser')
-                content = soup.get_text(separator=' ', strip=True)
-                
-                if content:
-                    return url, "Success", content, ""
-                else:
-                    return url, "Error", "", "Contenido vacío (Requests)"
-            else:
-                 return url, "Error", "", f"HTTP Error {response.status_code}"
-                
-        except Exception as e:
-            return url, "Error", "", f"Requests Error: {str(e)}"
-
-    # 2. SPECIAL CASE: Zonaprop (direct PDF HEAD request, bypasses Cloudflare)
-    if "zonaprop.com.ar" in url:
-        pdf_pattern = get_zonaprop_pdf_pattern(url)
-        if pdf_pattern is None:
-            return url, "Error", "", "URL de Zonaprop no reconocida (sin patrón PDF definido)"
-        
-        loop = asyncio.get_running_loop()
-        pdf_url = await loop.run_in_executor(None, find_latest_zonaprop_pdf, pdf_pattern)
-        
-        if pdf_url:
-            return url, "Success", f"PDF_URL: {pdf_url}", ""
-        else:
-            return url, "Error", "", "No se encontró PDF reciente (últimos 3 meses probados)"
-
-    # 3. SPECIAL CASE: Google Drive public folder
-    if is_gdrive_folder(url):
-        content, error_msg = fetch_gdrive_folder(url)
-        if content:
-            return url, "Success", content, ""
-        return url, "Error", "", error_msg or "No se pudo leer la carpeta de Google Drive"
-
-    # 4. STANDARD CASE: Playwright (Other URLs)
     if browser is None:
         return url, "Error", "", "Browser no disponible para esta URL"
 
@@ -509,7 +485,6 @@ async def fetch_url(browser, url):
         context = None
         page = None
         try:
-            # Setup context with better headers for bot evasion
             context = await browser.new_context(
                 user_agent=DEFAULT_USER_AGENT,
                 viewport={"width": 1920, "height": 1080},
@@ -520,35 +495,34 @@ async def fetch_url(browser, url):
                     "Referer": "https://www.google.com/"
                 }
             )
-            
+
             page = await context.new_page()
             page.set_default_navigation_timeout(PAGE_GOTO_TIMEOUT_MS)
             page.set_default_timeout(PAGE_TEXT_TIMEOUT_MS)
-            
-            # Standard Logic
+
             try:
                 await page.goto(url, wait_until="domcontentloaded")
             except Exception:
                 print(f"Timeout loading {url}, attempting capture anyway...")
-            
+
             try:
                 await page.wait_for_load_state("networkidle", timeout=PAGE_IDLE_TIMEOUT_MS)
             except Exception:
-                pass 
+                pass
+
             content = await page.inner_text("body")
 
             if content:
                 status = "Success"
                 error_msg = ""
-                break # Success, exit retry loop
-            else:
-                raise Exception("Empty content retrieved")
-            
+                break
+            raise Exception("Empty content retrieved")
+
         except Exception as e:
             status = "Error"
             error_msg = str(e)
             print(f"Attempt {attempt+1} failed for {url}: {e}")
-            
+
         finally:
             if page:
                 try:
@@ -560,11 +534,59 @@ async def fetch_url(browser, url):
                     await context.close()
                 except Exception:
                     pass
-                
+
     return url, status, content, error_msg
 
+
+async def get_or_launch_browser(playwright, browser_holder):
+    """Launch Chromium lazily only if a fallback is really needed."""
+    if browser_holder["browser"] is None:
+        browser_holder["browser"] = await playwright.chromium.launch(
+            headless=True,
+            args=PLAYWRIGHT_LAUNCH_ARGS,
+        )
+    return browser_holder["browser"]
+
+
+async def fetch_url(playwright, browser_holder, url):
+    """Fetch key content using special cases, requests first, and Playwright only as fallback."""
+    if "zonaprop.com.ar" in url:
+        pdf_pattern = get_zonaprop_pdf_pattern(url)
+        if pdf_pattern is None:
+            return url, "Error", "", "URL de Zonaprop no reconocida (sin patrón PDF definido)"
+
+        loop = asyncio.get_running_loop()
+        pdf_url = await loop.run_in_executor(None, find_latest_zonaprop_pdf, pdf_pattern)
+
+        if pdf_url:
+            return url, "Success", f"PDF_URL: {pdf_url}", ""
+        return url, "Error", "", "No se encontró PDF reciente (últimos 3 meses probados)"
+
+    if is_gdrive_folder(url):
+        content, error_msg = fetch_gdrive_folder(url)
+        if content:
+            return url, "Success", content, ""
+        return url, "Error", "", error_msg or "No se pudo leer la carpeta de Google Drive"
+
+    requests_error = ""
+    try:
+        content, requests_error = await fetch_text_with_requests(url)
+        if content:
+            return url, "Success", content, ""
+    except Exception as e:
+        requests_error = f"Requests Error: {str(e)}"
+
+    browser = await get_or_launch_browser(playwright, browser_holder)
+    playwright_result = await fetch_with_playwright(browser, url)
+    if playwright_result[1] == "Success":
+        return playwright_result
+
+    if requests_error:
+        return url, "Error", "", f"{requests_error} | Playwright: {playwright_result[3]}"
+    return playwright_result
+
 async def process_urls(urls, progress_callback=None):
-    """Runs Playwright to fetch all URLs with progress tracking."""
+    """Process URLs with requests-first scraping and lazy Playwright fallback."""
     results = []
     total = len(urls)
     if total == 0:
@@ -573,30 +595,21 @@ async def process_urls(urls, progress_callback=None):
         return results
     
     async with async_playwright() as p:
-        browser = None
+        browser_holder = {"browser": None}
         try:
-            # Keep concurrency modest to avoid exhausting resources on small Spaces.
             batch_size = BATCH_SIZE
             for i in range(0, total, batch_size):
                 batch = urls[i:i + batch_size]
-                needs_browser = any(
-                    "zonaprop.com.ar" not in url and not should_use_requests(url)
-                    for url in batch
-                )
-                if needs_browser and browser is None:
-                    browser = await p.chromium.launch(headless=True, args=PLAYWRIGHT_LAUNCH_ARGS)
-                
-                # Update status
+
                 current_progress = i / total
                 if progress_callback:
                     progress_callback(current_progress, f"Procesando lote {i//batch_size + 1}... ({i}/{total})")
-                
-                tasks = [fetch_url(browser, url) for url in batch]
-                batch_results = await asyncio.gather(*tasks)
-                results.extend(batch_results)
+
+                for url in batch:
+                    results.append(await fetch_url(p, browser_holder, url))
         finally:
-            if browser is not None:
-                await browser.close()
+            if browser_holder["browser"] is not None:
+                await browser_holder["browser"].close()
             
     if progress_callback:
         progress_callback(1.0, "Completado.")
@@ -697,7 +710,7 @@ else:
     st.sidebar.warning("⚠️ Persistencia no configurada (Faltan Secretos)")
 
 st.sidebar.header("Configuración")
-st.sidebar.caption(f"Lotes simultaneos: {BATCH_SIZE} | Reintentos por URL: {MAX_RETRIES}")
+st.sidebar.caption(f"URLs por lote: {BATCH_SIZE} | Reintentos por URL: {MAX_RETRIES}")
 st.sidebar.caption(
     f"URLs automaticas: {len(AUTO_MONITOR_URLS)} | Revision manual: {len(MANUAL_REVIEW_URLS)}"
 )
