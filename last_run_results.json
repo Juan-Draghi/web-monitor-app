@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-25T22:37:13",
+  "generated_at": "2026-03-26T21:21:39",
   "results": [
     {
       "URL": "https://buenosaires.gob.ar/jefaturadegabinete/desarrollo-urbano/normativa/codigo-urbanistico-y-de-edificacion",
@@ -28,7 +28,7 @@
     {
       "URL": "https://www.cpau.org/noticias",
       "Estado": "Success",
-      "Resultado": "Nuevo (primer rastreo)",
+      "Resultado": "Cambio detectado",
       "Error": ""
     },
     {
@@ -106,13 +106,13 @@
     {
       "URL": "https://www.reporteinmobiliario.com/",
       "Estado": "Success",
-      "Resultado": "Sin cambios",
+      "Resultado": "Cambio detectado",
       "Error": ""
     },
     {
       "URL": "https://areasglobales.com.ar/",
       "Estado": "Success",
-      "Resultado": "Sin cambios",
+      "Resultado": "Cambio detectado",
       "Error": ""
     },
     {
