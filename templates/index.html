@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Selección Informativa — Monitoreo web | CPAU</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    /* ── CPAU DESIGN TOKENS ──────────────────────────────────── */
+    :root {
+      --cpau-black:         #000000;
+      --cpau-navy:          #12054F;
+      --cpau-indigo:        #0A0591;
+      --cpau-blue:          #3400FF;
+      --cpau-gray-dark:     #616161;
+      --cpau-gray-warm:     #BFB5AB;
+      --cpau-gray-light:    #E0DBD9;
+      --cpau-white:         #FFFFFF;
+
+      --cpau-text-primary:    var(--cpau-black);
+      --cpau-text-secondary:  var(--cpau-gray-dark);
+      --cpau-text-link:       var(--cpau-navy);
+      --cpau-text-link-hover: var(--cpau-blue);
+      --cpau-bg-page:         #F7F6F5;
+      --cpau-bg-card:         var(--cpau-white);
+      --cpau-bg-section-alt:  #F7F6F5;
+      --cpau-border:          var(--cpau-gray-warm);
+      --cpau-border-light:    var(--cpau-gray-light);
+      --cpau-accent:          var(--cpau-blue);
+      --cpau-accent-dark:     var(--cpau-navy);
+      --cpau-focus-ring:      var(--cpau-blue);
+
+      --cpau-btn-primary-bg:       var(--cpau-blue);
+      --cpau-btn-primary-text:     var(--cpau-white);
+      --cpau-btn-primary-hover-bg: var(--cpau-indigo);
+
+      --cpau-font-brand: 'Avenir', 'Montserrat', sans-serif;
+      --cpau-font-body:  'Montserrat', 'Avenir', sans-serif;
+
+      --cpau-text-xs:   0.75rem;
+      --cpau-text-sm:   0.875rem;
+      --cpau-text-base: 1rem;
+      --cpau-text-lg:   1.125rem;
+      --cpau-text-xl:   1.25rem;
+      --cpau-text-2xl:  1.5rem;
+
+      --cpau-weight-regular:  400;
+      --cpau-weight-medium:   500;
+      --cpau-weight-semibold: 600;
+      --cpau-weight-bold:     700;
+      --cpau-weight-black:    900;
+
+      --cpau-leading-tight:   1.2;
+      --cpau-leading-normal:  1.5;
+
+      --cpau-space-1:  0.25rem;
+      --cpau-space-2:  0.5rem;
+      --cpau-space-3:  0.75rem;
+      --cpau-space-4:  1rem;
+      --cpau-space-5:  1.25rem;
+      --cpau-space-6:  1.5rem;
+      --cpau-space-8:  2rem;
+      --cpau-space-10: 2.5rem;
+      --cpau-space-12: 3rem;
+
+      --cpau-max-width:       880px;
+      --cpau-border-radius:   2px;
+      --cpau-border-radius-lg: 4px;
+
+      --cpau-shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+      --cpau-shadow-md: 0 2px 8px rgba(0,0,0,0.08);
+
+      --cpau-transition-fast:   150ms ease;
+      --cpau-transition-normal: 250ms ease;
+
+      /* Functional status colors (use sparingly per brand guide) */
+      --cpau-success: #1A7A2F;
+      --cpau-danger:  #CC0000;
+      --cpau-warning: #D4A017;
+    }
+
+    /* ── RESET ───────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--cpau-font-body);
+      font-size: var(--cpau-text-base);
+      color: var(--cpau-text-primary);
+      background: var(--cpau-bg-page);
+      line-height: var(--cpau-leading-normal);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── HEADER ──────────────────────────────────────────────── */
+    .cpau-header {
+      background: var(--cpau-white);
+      border-bottom: 1px solid var(--cpau-border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--cpau-shadow-sm);
+    }
+    .cpau-header__inner {
+      max-width: var(--cpau-max-width);
+      margin: 0 auto;
+      padding: var(--cpau-space-4) var(--cpau-space-6);
+      display: flex;
+      align-items: center;
+      gap: var(--cpau-space-5);
+    }
+    .cpau-header__logo {
+      height: 40px;
+      width: auto;
+      flex-shrink: 0;
+    }
+    .cpau-header__divider {
+      width: 1px;
+      height: 32px;
+      background: var(--cpau-border-light);
+      flex-shrink: 0;
+    }
+    .cpau-header__text {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+    }
+    .cpau-header__org {
+      font-size: var(--cpau-text-xs);
+      font-weight: var(--cpau-weight-medium);
+      color: var(--cpau-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .cpau-header__title {
+      font-family: var(--cpau-font-brand);
+      font-size: var(--cpau-text-lg);
+      font-weight: var(--cpau-weight-bold);
+      color: var(--cpau-text-primary);
+      letter-spacing: -0.01em;
+      line-height: var(--cpau-leading-tight);
+    }
+
+    /* ── MAIN CONTAINER ──────────────────────────────────────── */
+    main {
+      max-width: var(--cpau-max-width);
+      margin: 0 auto;
+      padding: var(--cpau-space-10) var(--cpau-space-6) var(--cpau-space-12);
+    }
+
+    /* ── CARD ────────────────────────────────────────────────── */
+    .card {
+      background: var(--cpau-bg-card);
+      border: 1px solid var(--cpau-border-light);
+      border-radius: var(--cpau-border-radius);
+      margin-bottom: var(--cpau-space-5);
+      overflow: hidden;
+      box-shadow: var(--cpau-shadow-sm);
+      transition: box-shadow var(--cpau-transition-normal);
+    }
+    .card:hover { box-shadow: var(--cpau-shadow-md); }
+    .card-body  { padding: var(--cpau-space-5) var(--cpau-space-6); }
+
+    /* ── SECTION HEADER (CPAU bar pattern) ───────────────────── */
+    .cpau-section-header {
+      display: flex;
+      align-items: center;
+      gap: var(--cpau-space-3);
+      padding: var(--cpau-space-4) var(--cpau-space-6);
+      border-bottom: 1px solid var(--cpau-border-light);
+    }
+    .cpau-section-header__bar {
+      width: 3px;
+      align-self: stretch;
+      min-height: 1.2em;
+      border-radius: 0;
+      flex-shrink: 0;
+    }
+    .cpau-section-header__title {
+      font-family: var(--cpau-font-brand);
+      font-size: var(--cpau-text-sm);
+      font-weight: var(--cpau-weight-bold);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--cpau-text-primary);
+    }
+    .cpau-section-header__count {
+      margin-left: auto;
+      font-family: var(--cpau-font-body);
+      font-size: var(--cpau-text-xs);
+      font-weight: var(--cpau-weight-semibold);
+      color: var(--cpau-text-secondary);
+      background: var(--cpau-bg-section-alt);
+      border: 1px solid var(--cpau-border-light);
+      border-radius: var(--cpau-border-radius);
+      padding: var(--cpau-space-1) var(--cpau-space-3);
+      letter-spacing: 0.02em;
+    }
+    /* Bar colors per section */
+    .sec-changes .cpau-section-header__bar { background: var(--cpau-success); }
+    .sec-new     .cpau-section-header__bar { background: var(--cpau-accent); }
+    .sec-errors  .cpau-section-header__bar { background: var(--cpau-danger); }
+
+    /* ── RUN PANEL ───────────────────────────────────────────── */
+    .run-row {
+      display: flex;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: var(--cpau-space-4);
+    }
+    .run-info { flex: 1; min-width: 0; }
+    .run-label {
+      font-size: var(--cpau-text-xs);
+      font-weight: var(--cpau-weight-medium);
+      color: var(--cpau-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: var(--cpau-space-1);
+    }
+    .run-timestamp {
+      font-family: var(--cpau-font-brand);
+      font-size: var(--cpau-text-base);
+      font-weight: var(--cpau-weight-semibold);
+      color: var(--cpau-text-primary);
+    }
+
+    /* ── PLAYWRIGHT BADGE ────────────────────────────────────── */
+    .pw-badge {
+      display: inline-block;
+      font-size: var(--cpau-text-xs);
+      font-weight: var(--cpau-weight-medium);
+      padding: var(--cpau-space-1) var(--cpau-space-3);
+      border-radius: var(--cpau-border-radius);
+      margin-top: var(--cpau-space-2);
+      letter-spacing: 0.01em;
+    }
+    .pw-ok   { background: #D6F0DC; color: #1A7A2F; border: 1px solid #9DD6A9; }
+    .pw-warn { background: #FDF3D7; color: #8A5700; border: 1px solid #F0D57A; }
+    .pw-none { display: none; }
+
+    /* ── PROGRESS ────────────────────────────────────────────── */
+    .progress-wrap { margin-top: var(--cpau-space-4); display: none; }
+    .progress-track {
+      background: var(--cpau-gray-light);
+      height: 4px;
+      overflow: hidden;
+      border-radius: 0;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--cpau-accent);
+      transition: width 0.4s ease;
+      width: 0%;
+    }
+    .progress-label {
+      font-size: var(--cpau-text-xs);
+      color: var(--cpau-text-secondary);
+      margin-top: var(--cpau-space-2);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      letter-spacing: 0.01em;
+    }
+
+    /* ── BUTTONS ─────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--cpau-space-2);
+      font-family: var(--cpau-font-body);
+      font-size: var(--cpau-text-sm);
+      font-weight: var(--cpau-weight-semibold);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      padding: var(--cpau-space-3) var(--cpau-space-6);
+      border-radius: var(--cpau-border-radius);
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: background var(--cpau-transition-fast), border-color var(--cpau-transition-fast), color var(--cpau-transition-fast);
+      white-space: nowrap;
+      line-height: 1;
+    }
+    .btn-primary {
+      background: var(--cpau-btn-primary-bg);
+      color: var(--cpau-btn-primary-text);
+      border-color: var(--cpau-btn-primary-bg);
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: var(--cpau-btn-primary-hover-bg);
+      border-color: var(--cpau-btn-primary-hover-bg);
+    }
+    .btn-primary:disabled {
+      background: var(--cpau-gray-warm);
+      border-color: var(--cpau-gray-warm);
+      cursor: not-allowed;
+    }
+    .btn-secondary {
+      background: transparent;
+      color: var(--cpau-black);
+      border-color: var(--cpau-black);
+    }
+    .btn-secondary:hover {
+      background: var(--cpau-black);
+      color: var(--cpau-white);
+    }
+    .btn-save {
+      background: var(--cpau-navy);
+      color: var(--cpau-white);
+      border-color: var(--cpau-navy);
+      font-size: var(--cpau-text-xs);
+      padding: var(--cpau-space-2) var(--cpau-space-5);
+    }
+    .btn-save:hover:not(:disabled) {
+      background: var(--cpau-accent);
+      border-color: var(--cpau-accent);
+    }
+    .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--cpau-navy);
+      border-color: var(--cpau-gray-light);
+      font-size: var(--cpau-text-xs);
+      padding: var(--cpau-space-2) var(--cpau-space-4);
+    }
+    .btn-ghost:hover {
+      border-color: var(--cpau-navy);
+      background: var(--cpau-bg-section-alt);
+    }
+    .btn-danger-sm {
+      background: transparent;
+      border: none;
+      color: var(--cpau-gray-warm);
+      cursor: pointer;
+      padding: var(--cpau-space-1) var(--cpau-space-2);
+      border-radius: var(--cpau-border-radius);
+      font-size: var(--cpau-text-base);
+      line-height: 1;
+      transition: color var(--cpau-transition-fast), background var(--cpau-transition-fast);
+    }
+    .btn-danger-sm:hover {
+      color: var(--cpau-danger);
+      background: #FCE8E8;
+    }
+
+    /* ── RESULT LIST ─────────────────────────────────────────── */
+    .result-list { padding: var(--cpau-space-2) 0; }
+    .result-item {
+      padding: var(--cpau-space-3) var(--cpau-space-6);
+      font-size: var(--cpau-text-sm);
+      border-bottom: 1px solid var(--cpau-border-light);
+      line-height: var(--cpau-leading-normal);
+      word-break: break-all;
+    }
+    .result-item:last-child { border-bottom: none; }
+    .result-item a {
+      color: var(--cpau-text-link);
+      text-decoration: none;
+      font-weight: var(--cpau-weight-medium);
+    }
+    .result-item a:hover {
+      color: var(--cpau-text-link-hover);
+      text-decoration: underline;
+    }
+    .result-item .error-detail {
+      display: block;
+      font-size: var(--cpau-text-xs);
+      color: var(--cpau-text-secondary);
+      margin-top: var(--cpau-space-1);
+      font-style: italic;
+    }
+    .empty-msg {
+      padding: var(--cpau-space-4) var(--cpau-space-6);
+      font-size: var(--cpau-text-sm);
+      color: var(--cpau-text-secondary);
+      font-style: italic;
+    }
+
+    /* ── URL MANAGER ─────────────────────────────────────────── */
+    .url-manager-toggle {
+      display: flex;
+      align-items: center;
+      gap: var(--cpau-space-3);
+      width: 100%;
+      padding: var(--cpau-space-4) var(--cpau-space-6);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: var(--cpau-font-body);
+      font-size: var(--cpau-text-sm);
+      font-weight: var(--cpau-weight-semibold);
+      color: var(--cpau-text-primary);
+      text-align: left;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      transition: background var(--cpau-transition-fast);
+    }
+    .url-manager-toggle:hover { background: var(--cpau-bg-section-alt); }
+    .url-manager-toggle .arrow {
+      margin-left: auto;
+      font-size: var(--cpau-text-xs);
+      color: var(--cpau-text-secondary);
+      transition: transform 0.2s;
+    }
+    .url-manager-toggle.open .arrow { transform: rotate(180deg); }
+    .url-manager-body {
+      display: none;
+      padding: 0 var(--cpau-space-6) var(--cpau-space-6);
+      border-top: 1px solid var(--cpau-border-light);
+    }
+    .url-manager-body.open { display: block; }
+
+    .url-list { list-style: none; margin: var(--cpau-space-4) 0 var(--cpau-space-5); }
+    .url-row {
+      display: flex;
+      align-items: center;
+      gap: var(--cpau-space-3);
+      padding: var(--cpau-space-2) 0;
+      border-bottom: 1px solid var(--cpau-border-light);
+    }
+    .url-row:last-child { border-bottom: none; }
+    .url-input {
+      flex: 1;
+      font-family: var(--cpau-font-body);
+      font-size: var(--cpau-text-sm);
+      color: var(--cpau-text-primary);
+      background: var(--cpau-white);
+      border: 1px solid var(--cpau-border);
+      border-radius: var(--cpau-border-radius);
+      padding: var(--cpau-space-2) var(--cpau-space-3);
+      transition: border-color var(--cpau-transition-fast), box-shadow var(--cpau-transition-fast);
+    }
+    .url-input:focus {
+      outline: none;
+      border-color: var(--cpau-focus-ring);
+      box-shadow: 0 0 0 3px rgba(52, 0, 255, 0.10);
+    }
+
+    .add-row {
+      display: flex;
+      gap: var(--cpau-space-3);
+      margin-bottom: var(--cpau-space-5);
+    }
+    .add-row input {
+      flex: 1;
+      font-family: var(--cpau-font-body);
+      font-size: var(--cpau-text-sm);
+      color: var(--cpau-text-primary);
+      background: var(--cpau-white);
+      border: 1px dashed var(--cpau-gray-warm);
+      border-radius: var(--cpau-border-radius);
+      padding: var(--cpau-space-2) var(--cpau-space-3);
+      transition: border-color var(--cpau-transition-fast), box-shadow var(--cpau-transition-fast);
+    }
+    .add-row input::placeholder { color: var(--cpau-gray-warm); }
+    .add-row input:focus {
+      outline: none;
+      border-style: solid;
+      border-color: var(--cpau-focus-ring);
+      box-shadow: 0 0 0 3px rgba(52, 0, 255, 0.10);
+    }
+
+    .url-save-row {
+      display: flex;
+      align-items: center;
+      gap: var(--cpau-space-4);
+    }
+    .save-msg {
+      font-size: var(--cpau-text-xs);
+      color: var(--cpau-success);
+      font-weight: var(--cpau-weight-semibold);
+      letter-spacing: 0.02em;
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+    .save-msg.visible { opacity: 1; }
+
+    /* ── FOOTER ──────────────────────────────────────────────── */
+    .cpau-footer {
+      background: var(--cpau-white);
+      border-top: 1px solid var(--cpau-border-light);
+      margin-top: var(--cpau-space-8);
+    }
+    .cpau-footer__inner {
+      max-width: var(--cpau-max-width);
+      margin: 0 auto;
+      padding: var(--cpau-space-5) var(--cpau-space-6);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--cpau-space-4);
+    }
+    .cpau-footer__copyright {
+      font-size: var(--cpau-text-xs);
+      color: var(--cpau-text-secondary);
+      letter-spacing: 0.01em;
+    }
+    .cpau-footer__version {
+      font-size: var(--cpau-text-xs);
+      color: var(--cpau-gray-warm);
+      letter-spacing: 0.02em;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ──────────────────────────────────────────────── -->
+<header class="cpau-header">
+  <div class="cpau-header__inner">
+    <img src="/static/logo.png" alt="CPAU — Consejo Profesional de Arquitectura y Urbanismo" class="cpau-header__logo">
+    <div class="cpau-header__divider"></div>
+    <div class="cpau-header__text">
+      <span class="cpau-header__org">Selección Informativa</span>
+      <span class="cpau-header__title">Monitoreo web</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── PANEL DE EJECUCIÓN ─────────────────────────────────── -->
+  <div class="card">
+    <div class="card-body">
+      <div class="run-row">
+        <div class="run-info">
+          <div class="run-label">Última corrida</div>
+          <div class="run-timestamp" id="last-run">—</div>
+          <span class="pw-badge pw-none" id="pw-badge"></span>
+        </div>
+        <button class="btn btn-primary" id="btn-run" onclick="startRun()">
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M3 2.5l10 5.5-10 5.5V2.5z"/>
+          </svg>
+          Ejecutar monitoreo
+        </button>
+      </div>
+      <div class="progress-wrap" id="progress-wrap">
+        <div class="progress-track">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <div class="progress-label" id="progress-label">Iniciando…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CAMBIOS DETECTADOS ─────────────────────────────────── -->
+  <div class="card sec-changes">
+    <div class="cpau-section-header">
+      <div class="cpau-section-header__bar"></div>
+      <span class="cpau-section-header__title">Cambios detectados</span>
+      <span class="cpau-section-header__count" id="count-changes">0</span>
+    </div>
+    <div class="result-list" id="list-changes">
+      <div class="empty-msg">Sin cambios detectados.</div>
+    </div>
+  </div>
+
+  <!-- ── NUEVAS EN PRIMER RASTREO ──────────────────────────── -->
+  <div class="card sec-new">
+    <div class="cpau-section-header">
+      <div class="cpau-section-header__bar"></div>
+      <span class="cpau-section-header__title">Nuevas en primer rastreo</span>
+      <span class="cpau-section-header__count" id="count-new">0</span>
+    </div>
+    <div class="result-list" id="list-new">
+      <div class="empty-msg">Ninguna.</div>
+    </div>
+  </div>
+
+  <!-- ── ERRORES DE LECTURA ─────────────────────────────────── -->
+  <div class="card sec-errors">
+    <div class="cpau-section-header">
+      <div class="cpau-section-header__bar"></div>
+      <span class="cpau-section-header__title">Errores de lectura</span>
+      <span class="cpau-section-header__count" id="count-errors">0</span>
+    </div>
+    <div class="result-list" id="list-errors">
+      <div class="empty-msg">Sin errores.</div>
+    </div>
+  </div>
+
+  <!-- ── GESTIÓN DE URLs ────────────────────────────────────── -->
+  <div class="card">
+    <button class="url-manager-toggle" id="url-toggle" onclick="toggleUrlManager()">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zm8 0A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm-8 8A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm8 0A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3z"/>
+      </svg>
+      Gestionar URLs monitoreadas
+      <span class="arrow">▼</span>
+    </button>
+    <div class="url-manager-body" id="url-manager-body">
+      <ul class="url-list" id="url-list"></ul>
+
+      <div class="add-row">
+        <input type="url" id="new-url-input" placeholder="https://…" onkeydown="if(event.key==='Enter') addUrl()">
+        <button class="btn btn-ghost" onclick="addUrl()">+ Agregar</button>
+      </div>
+
+      <div class="url-save-row">
+        <button class="btn btn-save" id="btn-save-urls" onclick="saveUrls()">Guardar cambios</button>
+        <span class="save-msg" id="save-msg">✓ Guardado</span>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── FOOTER ─────────────────────────────────────────────── -->
+<footer class="cpau-footer">
+  <div class="cpau-footer__inner">
+    <span class="cpau-footer__copyright">© Consejo Profesional de Arquitectura y Urbanismo</span>
+    <span class="cpau-footer__version">Selección Informativa — Monitoreo web</span>
+  </div>
+</footer>
+
+<script>
+  let pollTimer = null;
+  let urlsDirty = false;
+
+  window.onload = function () {
+    loadResults();
+  };
+
+  // ── MONITOREO ────────────────────────────────────────────
+
+  function startRun() {
+    document.getElementById('btn-run').disabled = true;
+    document.getElementById('progress-wrap').style.display = 'block';
+    setProgress(0, 1, 'Iniciando…');
+
+    fetch('/run', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) {
+          alert(d.error);
+          document.getElementById('btn-run').disabled = false;
+          document.getElementById('progress-wrap').style.display = 'none';
+        } else {
+          pollTimer = setInterval(pollStatus, 600);
+        }
+      })
+      .catch(() => {
+        document.getElementById('btn-run').disabled = false;
+        document.getElementById('progress-wrap').style.display = 'none';
+      });
+  }
+
+  function pollStatus() {
+    fetch('/status').then(r => r.json()).then(d => {
+      if (d.playwright_available === true)  showPwBadge(true, '');
+      if (d.playwright_available === false) showPwBadge(false, d.playwright_message);
+
+      const pct = d.total > 0 ? Math.round(d.current / d.total * 100) : 0;
+      const label = d.url
+        ? d.current + '/' + d.total + '  ' + d.url.replace(/^https?:\/\//, '')
+        : d.current + '/' + d.total;
+      setProgress(pct, d.total, label);
+
+      if (!d.running && d.current > 0) {
+        clearInterval(pollTimer);
+        document.getElementById('btn-run').disabled = false;
+        document.getElementById('progress-wrap').style.display = 'none';
+        loadResults();
+      }
+    });
+  }
+
+  function setProgress(pct, total, label) {
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-label').textContent = label;
+  }
+
+  function showPwBadge(ok, msg) {
+    const el = document.getElementById('pw-badge');
+    el.className = 'pw-badge ' + (ok ? 'pw-ok' : 'pw-warn');
+    el.textContent = ok
+      ? 'Playwright disponible ✓'
+      : '⚠ Playwright no disponible — ' + msg;
+  }
+
+  function loadResults() {
+    fetch('/results').then(r => r.json()).then(d => {
+      if (d.generated_at)
+        document.getElementById('last-run').textContent = d.generated_at.replace('T', ' ');
+      renderResults(d.results || []);
+    });
+  }
+
+  function renderResults(results) {
+    const changes  = results.filter(r => r.Resultado === 'Cambio detectado');
+    const newItems = results.filter(r => r.Resultado === 'Nuevo (primer rastreo)');
+    const errors   = results.filter(r => r.Resultado === 'Error de lectura');
+
+    document.getElementById('count-changes').textContent = changes.length;
+    document.getElementById('count-new').textContent     = newItems.length;
+    document.getElementById('count-errors').textContent  = errors.length;
+
+    renderList('list-changes', changes,  'Sin cambios detectados.');
+    renderList('list-new',     newItems, 'Ninguna.');
+    renderList('list-errors',  errors,   'Sin errores.', true);
+  }
+
+  function renderList(id, items, emptyMsg, showError) {
+    const el = document.getElementById(id);
+    if (!items.length) { el.innerHTML = '<div class="empty-msg">' + emptyMsg + '</div>'; return; }
+    el.innerHTML = items.map(r => {
+      const link = '<a href="' + r.URL + '" target="_blank">' + r.URL + '</a>';
+      const err  = showError && r.Error
+        ? '<span class="error-detail">' + escHtml(r.Error) + '</span>' : '';
+      return '<div class="result-item">' + link + err + '</div>';
+    }).join('');
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── GESTIÓN DE URLs ──────────────────────────────────────
+
+  function toggleUrlManager() {
+    const btn  = document.getElementById('url-toggle');
+    const body = document.getElementById('url-manager-body');
+    const open = body.classList.toggle('open');
+    btn.classList.toggle('open', open);
+    if (open) loadUrlList();
+  }
+
+  function loadUrlList() {
+    fetch('/urls').then(r => r.json()).then(d => {
+      renderUrlList(d.urls || []);
+      urlsDirty = false;
+    });
+  }
+
+  function renderUrlList(urls) {
+    const list = document.getElementById('url-list');
+    list.innerHTML = urls.map((u, i) => `
+      <li class="url-row">
+        <input class="url-input" type="url" value="${escHtml(u)}"
+               oninput="markDirty()" data-index="${i}">
+        <button class="btn-danger-sm" onclick="removeUrl(${i})" title="Eliminar">✕</button>
+      </li>`).join('');
+  }
+
+  function markDirty() { urlsDirty = true; }
+
+  function addUrl() {
+    const input = document.getElementById('new-url-input');
+    const val = input.value.trim();
+    if (!val) return;
+    const rows = [...document.querySelectorAll('#url-list .url-input')].map(i => i.value.trim());
+    rows.push(val);
+    renderUrlList(rows);
+    input.value = '';
+    urlsDirty = true;
+  }
+
+  function removeUrl(index) {
+    const rows = [...document.querySelectorAll('#url-list .url-input')].map(i => i.value.trim());
+    rows.splice(index, 1);
+    renderUrlList(rows);
+    urlsDirty = true;
+  }
+
+  function saveUrls() {
+    const urls = [...document.querySelectorAll('#url-list .url-input')]
+      .map(i => i.value.trim()).filter(Boolean);
+    const btn = document.getElementById('btn-save-urls');
+    btn.disabled = true;
+
+    fetch('/urls', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls })
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { alert(d.error); }
+      else {
+        urlsDirty = false;
+        const msg = document.getElementById('save-msg');
+        msg.classList.add('visible');
+        setTimeout(() => msg.classList.remove('visible'), 2500);
+        renderUrlList(urls);
+      }
+    })
+    .finally(() => { btn.disabled = false; });
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,29 @@
+# Entorno virtual Python
+venv/
+
+# Compilación PyInstaller
+build/
+dist/
+*.spec.bak
+
+# Caché Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Datos de ejecución (se generan en cada corrida)
+web_monitoring_hashes.json
+last_run_results.json
+monitoreo_error.log
+
+# Íconos generados (se regeneran con compilar.bat)
+static/logo.ico
+static/app_icon.ico
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code
+.claude/
