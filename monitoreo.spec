@@ -3,10 +3,27 @@
 # Genera: dist/MonitoreoWeb/MonitoreoWeb.exe  (modo onedir, sin consola)
 
 import os
-from PyInstaller.utils.hooks import collect_all, collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_submodules, copy_metadata
 
 # ── Playwright: recolectar todo (incluye el driver Node.js de ~80 MB) ──────
 pw_datas, pw_binaries, pw_hidden = collect_all('playwright')
+
+# ── Metadatos de paquetes que los consultan en runtime ─────────────────────
+# Flask/Werkzeug usan importlib.metadata para leer versiones y entry points.
+# Sin estos .dist-info PyInstaller lanza "No package metadata was found".
+pkg_metadata = (
+    copy_metadata('werkzeug') +
+    copy_metadata('flask') +
+    copy_metadata('jinja2') +
+    copy_metadata('click') +
+    copy_metadata('requests') +
+    copy_metadata('charset-normalizer') +
+    copy_metadata('certifi') +
+    copy_metadata('urllib3') +
+    copy_metadata('idna') +
+    copy_metadata('beautifulsoup4') +
+    copy_metadata('pyee')
+)
 
 # ── Assets locales ─────────────────────────────────────────────────────────
 local_datas = [
@@ -22,7 +39,7 @@ a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=pw_binaries,
-    datas=local_datas + pw_datas,
+    datas=local_datas + pw_datas + pkg_metadata,
     hiddenimports=pw_hidden + [
         # Flask / Werkzeug
         'flask',
