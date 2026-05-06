@@ -259,67 +259,82 @@ def find_latest_zonaprop_pdf(pdf_pattern, session):
     return None
 
 
-def parse_gdrive_date(date_text):
-    month_map = {
-        'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4,
-        'may': 5, 'jun': 6, 'jul': 7, 'ago': 8,
-        'sept': 9, 'oct': 10, 'nov': 11, 'dic': 12,
-    }
-    cleaned = date_text.strip().lower().replace('.', '')
-    parts = cleaned.split()
-    if len(parts) != 3:
-        return None
-    day, month_text, year = parts
-    month = month_map.get(month_text)
-    if month is None:
-        return None
+
+async def fetch_gdrive_folder_playwright(browser, url):
+    """Obtiene la lista de archivos de una carpeta pública de Google Drive.
+
+    Google Drive renderiza el listado con JavaScript, por lo que requests
+    siempre devuelve una página vacía. Playwright ejecuta el JS y espera
+    a que aparezcan los nombres de archivo antes de extraerlos.
+    """
+    if browser is None:
+        return url, 'Error', '', 'Requiere Playwright para leer carpetas de Drive'
+
+    context = None
+    page = None
     try:
-        return datetime(int(year), month, int(day))
-    except ValueError:
-        return None
-
-
-def fetch_gdrive_folder(url, session):
-    import urllib3
-
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    try:
-        response = session.get(url, timeout=REQUEST_TIMEOUT, verify=False)
-        if response.status_code != 200:
-            return None, f'HTTP {response.status_code}'
-        soup = BeautifulSoup(response.text, 'html.parser')
-        entries = []
-        for row in soup.select('tr[role="row"]'):
-            name_el = row.select_one('td[data-column-field="6"] [data-tooltip]')
-            date_el = row.select_one('td[data-column-field="5"] span')
-            if not name_el or not date_el:
-                continue
-            file_name = name_el.get('data-tooltip', '').strip()
-            file_name = file_name.removesuffix(' PDF').removesuffix(' PPTX').removesuffix(' PPT')
-            modified_text = date_el.get_text(' ', strip=True)
-            modified_dt = parse_gdrive_date(modified_text)
-            if not file_name or modified_dt is None:
-                continue
-            entries.append({
-                'name': file_name,
-                'modified_text': modified_text,
-                'modified_iso': modified_dt.date().isoformat(),
-            })
-        if not entries:
-            return None, 'No se encontraron archivos con metadatos de fecha en la carpeta'
-        deduped = {(e['name'], e['modified_iso']): e for e in entries}
-        sorted_entries = sorted(
-            deduped.values(),
-            key=lambda e: (e['modified_iso'], e['name']),
-            reverse=True,
+        context = await browser.new_context(
+            user_agent=DEFAULT_USER_AGENT,
+            viewport={'width': 1920, 'height': 1080},
+            extra_http_headers={'Accept-Language': 'es-419,es;q=0.9'},
         )
-        content = '\n'.join(
-            f"{e['modified_iso']}|{e['modified_text']}|{e['name']}"
-            for e in sorted_entries[:6]
-        )
-        return content, ''
+        page = await context.new_page()
+        page.set_default_navigation_timeout(PAGE_GOTO_TIMEOUT_MS)
+
+        await page.goto(url, wait_until='domcontentloaded')
+
+        # Esperar a que Drive renderice la grilla de archivos
+        for selector in ('[data-tooltip]', '[role="gridcell"]', 'c-wiz'):
+            try:
+                await page.wait_for_selector(selector, timeout=8000)
+                break
+            except Exception:
+                continue
+
+        html = await page.content()
+        soup = BeautifulSoup(html, 'html.parser')
+
+        names = set()
+
+        # Estrategia 1: atributo data-tooltip (nombres de archivos en Drive)
+        for el in soup.select('[data-tooltip]'):
+            tooltip = el.get('data-tooltip', '').strip()
+            # Excluir tooltips que son URLs, botones de UI o muy cortos
+            if (tooltip and len(tooltip) > 3
+                    and not tooltip.startswith('http')
+                    and not tooltip.startswith('Compartir')
+                    and not tooltip.startswith('Más')):
+                names.add(tooltip)
+
+        # Estrategia 2: texto de celdas de grilla (vista lista)
+        if len(names) < 2:
+            for el in soup.select('[role="gridcell"] span'):
+                text = el.get_text(strip=True)
+                if text and len(text) > 3:
+                    names.add(text)
+
+        if not names:
+            return url, 'Error', '', (
+                'No se encontraron archivos. La carpeta puede estar vacía, '
+                'requerir inicio de sesión, o Drive cambió su estructura HTML.'
+            )
+
+        content = '\n'.join(sorted(names))
+        return url, 'Success', content, ''
+
     except Exception as exc:
-        return None, str(exc)
+        return url, 'Error', '', f'Drive error: {exc}'
+    finally:
+        if page:
+            try:
+                await page.close()
+            except Exception:
+                pass
+        if context:
+            try:
+                await context.close()
+            except Exception:
+                pass
 
 
 # ---------------------------------------------------------------------------
@@ -454,13 +469,9 @@ async def fetch_url(session, url, browser=None):
             return url, 'Success', f'PDF_URL: {pdf_url}', ''
         return url, 'Error', '', 'No se encontró PDF en la página'
 
-    # Google Drive: lógica especial para listar archivos
+    # Google Drive: usa Playwright para renderizar el listado de archivos
     if is_gdrive_folder(url):
-        loop = asyncio.get_running_loop()
-        content, error = await loop.run_in_executor(None, fetch_gdrive_folder, url, session)
-        if content:
-            return url, 'Success', content, ''
-        return url, 'Error', '', error
+        return await fetch_gdrive_folder_playwright(browser, url)
 
     # Dominios que necesitan Playwright como método primario
     if any(domain in url for domain in PLAYWRIGHT_PRIMARY_DOMAINS):
