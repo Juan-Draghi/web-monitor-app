@@ -17,20 +17,35 @@ except Exception:
 import os as _os
 import sys as _sys
 
+
+def resolve_base_dir():
+    """Devuelve la carpeta unica donde se leen y guardan los datos."""
+    if not getattr(_sys, 'frozen', False):
+        return Path(__file__).parent
+
+    executable_dir = Path(_sys.executable).parent
+    project_dir = executable_dir.parent.parent
+    project_urls = project_dir / 'urls.txt'
+
+    if executable_dir.name == 'MonitoreoWeb' and executable_dir.parent.name == 'dist':
+        if project_urls.exists():
+            return project_dir
+
+    return executable_dir
+
+
 # Cuando corre como ejecutable PyInstaller (frozen):
 # - Los datos (urls.txt, resultados) se guardan junto al .exe
 # - El Playwright empaquetado busca el browser en una ruta interna; hay que
 #   redirigirlo a %LOCALAPPDATA%\ms-playwright donde instalar.bat lo instaló.
 if getattr(_sys, 'frozen', False):
-    BASE_DIR = Path(_sys.executable).parent
     _local_appdata = _os.environ.get('LOCALAPPDATA', '')
     if _local_appdata:
         _os.environ.setdefault(
             'PLAYWRIGHT_BROWSERS_PATH',
             _os.path.join(_local_appdata, 'ms-playwright'),
         )
-else:
-    BASE_DIR = Path(__file__).parent
+BASE_DIR = resolve_base_dir()
 
 URLS_FILE = BASE_DIR / 'urls.txt'
 HASHES_FILE = BASE_DIR / 'web_monitoring_hashes.json'
@@ -83,11 +98,19 @@ ZONAPROP_PDF_PATTERNS = {
 # ---------------------------------------------------------------------------
 
 def load_urls():
+    if not URLS_FILE.exists():
+        URLS_FILE.write_text('', encoding='utf-8')
     return [
         line.strip()
         for line in URLS_FILE.read_text(encoding='utf-8').splitlines()
         if line.strip()
     ]
+
+
+def save_urls(urls):
+    clean_urls = [url.strip() for url in urls if url.strip()]
+    URLS_FILE.write_text('\n'.join(clean_urls) + '\n', encoding='utf-8')
+    return len(clean_urls)
 
 
 def clean_text(text):

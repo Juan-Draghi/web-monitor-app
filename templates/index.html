@@ -410,6 +410,12 @@
     .url-manager-body.open { display: block; }
 
     .url-list { list-style: none; margin: var(--cpau-space-4) 0 var(--cpau-space-5); }
+    .url-file-path {
+      margin-top: var(--cpau-space-4);
+      font-size: var(--cpau-text-xs);
+      color: var(--cpau-text-secondary);
+      word-break: break-all;
+    }
     .url-row {
       display: flex;
       align-items: center;
@@ -588,6 +594,7 @@
       <span class="arrow">▼</span>
     </button>
     <div class="url-manager-body" id="url-manager-body">
+      <div class="url-file-path" id="url-file-path"></div>
       <ul class="url-list" id="url-list"></ul>
 
       <div class="add-row">
@@ -726,6 +733,7 @@
 
   function loadUrlList() {
     fetch('/urls').then(r => r.json()).then(d => {
+      document.getElementById('url-file-path').textContent = d.file ? 'Archivo activo: ' + d.file : '';
       renderUrlList(d.urls || []);
       urlsDirty = false;
     });

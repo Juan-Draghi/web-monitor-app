@@ -61,6 +61,16 @@ La aplicación corre en `http://localhost:5000` y muestra:
 | `compilar.bat` | Generación del ejecutable `.exe` |
 | `ejecutar.bat` | Inicio en modo desarrollo |
 
+## Archivo activo de URLs
+
+La lista que usa el monitoreo es `urls.txt` en la carpeta raíz del proyecto.
+La interfaz web también escribe sobre ese mismo archivo y muestra la ruta activa
+en el panel **Gestionar URLs monitoreadas**.
+
+Si se recompila el ejecutable, no editar copias antiguas de `urls.txt` dentro
+de `dist/MonitoreoWeb`; la referencia válida es la ruta indicada por la
+interfaz.
+
 ## Estrategia de monitoreo
 
 - **Método principal**: `requests` + `BeautifulSoup` para sitios estáticos

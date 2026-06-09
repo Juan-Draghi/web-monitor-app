@@ -8,7 +8,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
 
-from monitor import RESULTS_FILE, URLS_FILE, load_urls, run_monitor
+from monitor import RESULTS_FILE, URLS_FILE, load_urls, run_monitor, save_urls as write_urls
 
 # ── Path handling: dev vs ejecutable PyInstaller ────────────────────────────
 # sys._MEIPASS  → donde PyInstaller extrajo los assets (templates, static)
@@ -105,7 +105,7 @@ def results():
 @app.route('/urls', methods=['GET'])
 def get_urls():
     urls = load_urls()
-    return jsonify({'urls': urls})
+    return jsonify({'urls': urls, 'file': str(URLS_FILE)})
 
 
 @app.route('/urls', methods=['POST'])
@@ -115,8 +115,8 @@ def save_urls():
             return jsonify({'error': 'No se puede editar mientras hay una corrida en curso'}), 409
     data = request.get_json()
     urls = [u.strip() for u in data.get('urls', []) if u.strip()]
-    URLS_FILE.write_text('\n'.join(urls) + '\n', encoding='utf-8')
-    return jsonify({'saved': len(urls)})
+    saved = write_urls(urls)
+    return jsonify({'saved': saved, 'file': str(URLS_FILE)})
 
 
 def _open_browser():
