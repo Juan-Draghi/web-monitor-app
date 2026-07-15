@@ -40,13 +40,14 @@ Inicia el servidor Flask directamente desde el entorno virtual. Útil para modif
 
 ## Interfaz
 
-La aplicación corre en `http://localhost:5000` y muestra:
+La aplicación corre en `http://localhost:5000` y utiliza una interfaz operativa neutra, sin fuentes ni recursos visuales externos. La pantalla organiza el trabajo en cuatro niveles:
 
-- **Última corrida**: fecha/hora y estado de Playwright
-- **Cambios detectados**: URLs cuyo contenido cambió desde la corrida anterior
-- **Nuevas en primer rastreo**: URLs procesadas por primera vez
-- **Errores de lectura**: URLs que no pudieron ser accedidas
-- **Gestionar URLs**: panel para agregar, editar o eliminar URLs sin tocar archivos
+- **Ejecución**: fecha de la última corrida, estado del navegador dinámico, botón principal y progreso.
+- **Resumen**: total de fuentes, cambios, altas iniciales, revisiones manuales y errores.
+- **Resultados**: cambios detectados como contenido prioritario y estados secundarios plegables.
+- **Fuentes monitoreadas**: panel cerrado por defecto para agregar, editar, eliminar y guardar URLs.
+
+El diseño se adapta a pantallas de escritorio, tablet y móvil sin desplazamiento horizontal.
 
 ## Archivos principales
 
@@ -55,7 +56,8 @@ La aplicación corre en `http://localhost:5000` y muestra:
 | `urls.txt` | Lista de URLs monitoreadas (una por línea) |
 | `monitor.py` | Lógica de monitoreo, hashing y detección de cambios |
 | `app.py` | Servidor Flask y manejo de estado |
-| `templates/index.html` | Interfaz web (diseño CPAU) |
+| `templates/index.html` | Estructura y comportamiento de la interfaz web |
+| `static/operational-ui.css` | Sistema visual neutro y reglas responsive |
 | `monitoreo.spec` | Configuración de compilación PyInstaller |
 | `instalar.bat` | Instalación de dependencias |
 | `compilar.bat` | Generación del ejecutable `.exe` |
@@ -65,11 +67,12 @@ La aplicación corre en `http://localhost:5000` y muestra:
 
 - `docs/project-log.md`: registro cronológico de cambios relevantes, motivos y verificaciones.
 - `docs/adr/`: decisiones técnicas o metodológicas con contexto, alternativas y consecuencias.
+
 ## Archivo activo de URLs
 
 La lista que usa el monitoreo es `urls.txt` en la carpeta raíz del proyecto.
 La interfaz web también escribe sobre ese mismo archivo y muestra la ruta activa
-en el panel **Gestionar URLs monitoreadas**.
+en el panel **Gestionar lista de URLs**.
 
 Si se recompila el ejecutable, no editar copias antiguas de `urls.txt` dentro
 de `dist/MonitoreoWeb`; la referencia válida es la ruta indicada por la

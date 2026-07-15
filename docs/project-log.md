@@ -6,6 +6,48 @@ origino, la solucion aplicada y las verificaciones realizadas.
 Para decisiones tecnicas con alternativas o consecuencias relevantes, crear
 ademas un ADR en `docs/adr/`.
 
+## 2026-07-15 - Adoptar interfaz operativa neutra
+
+**Problema**
+
+La interfaz dependia de un sistema visual institucional identificado como
+`cpau-*` que habia sido eliminado. La estructura anterior tambien presentaba
+todos los estados como tarjetas equivalentes, sin priorizar las novedades que
+requieren atencion.
+
+**Cambio aplicado**
+
+- Se reemplazo la plantilla por una interfaz operativa neutra.
+- Se separaron los estilos en `static/operational-ui.css`.
+- Se agrego una banda de metricas con el total de fuentes procesadas.
+- Los cambios detectados quedaron como contenido prioritario.
+- Primer rastreo, revision manual y errores quedaron en secciones plegables.
+- El gestor de URLs permanece cerrado por defecto y conserva la confirmacion de
+  guardado junto al boton.
+- Se eliminaron la fuente externa, el logotipo y las clases `cpau-*`.
+- Se preservaron las rutas Flask, los formatos de datos y los IDs consumidos por
+  JavaScript.
+
+**Motivo**
+
+Facilitar el trabajo diario con una jerarquia mas clara, una estetica neutral y
+un sistema visual mantenible sin dependencias institucionales obsoletas.
+
+**Verificacion**
+
+- Pruebas Flask de la pagina, CSS y endpoints de lectura.
+- Guardado de URLs simulado sin escribir `urls.txt`.
+- Validacion de sintaxis Python e IDs HTML.
+- Prueba de navegador con los 34 resultados y 34 URLs reales existentes.
+- Alta de URL probada solo en memoria y descartada mediante recarga.
+- Verificacion responsive a 1280, 980, 720 y 360 px sin desbordamiento.
+- Consola del navegador sin errores de la aplicacion.
+- `git diff --check`.
+
+**ADR relacionado**
+
+- `docs/adr/0005-adopt-operational-interface.md`
+
 ## 2026-07-15 - Unificar archivo activo de URLs
 
 **Problema**
