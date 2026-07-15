@@ -61,6 +61,10 @@ La aplicación corre en `http://localhost:5000` y muestra:
 | `compilar.bat` | Generación del ejecutable `.exe` |
 | `ejecutar.bat` | Inicio en modo desarrollo |
 
+## Documentación del proyecto
+
+- `docs/project-log.md`: registro cronológico de cambios relevantes, motivos y verificaciones.
+- `docs/adr/`: decisiones técnicas o metodológicas con contexto, alternativas y consecuencias.
 ## Archivo activo de URLs
 
 La lista que usa el monitoreo es `urls.txt` en la carpeta raíz del proyecto.

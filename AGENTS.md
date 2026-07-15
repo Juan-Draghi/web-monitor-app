@@ -93,3 +93,10 @@ Flujo de publicación en GitHub:
 - Crear commits con mensajes claros y descriptivos.
 - No crear ramas auxiliares ni pull requests como flujo normal, salvo que la persona usuaria lo pida explícitamente.
 - No hacer `push` sin una instrucción explícita de publicación.
+
+Registro de cambios y decisiones:
+- Después de cambios funcionales, metodológicos o de arquitectura, actualizar `docs/project-log.md` con fecha, problema, cambio aplicado, motivo y verificación.
+- Crear un ADR en `docs/adr/` cuando el cambio implique una decisión técnica o metodológica con alternativas razonables, consecuencias de mantenimiento o impacto en el flujo de trabajo.
+- No usar ADRs para cambios menores, correcciones tipográficas o ajustes puramente mecánicos.
+- Mantener los ADRs como historia append-only: si una decisión cambia, crear un nuevo ADR y referenciar el anterior en lugar de reescribirlo silenciosamente.
+- Antes de commitear, revisar si el cambio requiere entrada en el log o ADR y explicitarlo en el resumen final.
