@@ -13,6 +13,7 @@ __pycache__/
 
 # Datos de ejecución (se generan en cada corrida)
 web_monitoring_hashes.json
+web_monitoring_metadata.json
 last_run_results.json
 monitoreo_error.log
 

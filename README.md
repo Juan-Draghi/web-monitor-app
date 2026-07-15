@@ -71,6 +71,17 @@ Si se recompila el ejecutable, no editar copias antiguas de `urls.txt` dentro
 de `dist/MonitoreoWeb`; la referencia válida es la ruta indicada por la
 interfaz.
 
+## Revisión manual por antigüedad
+
+La aplicación guarda metadatos operativos en `web_monitoring_metadata.json`.
+Ese archivo registra, por URL, la última lectura exitosa, el último cambio
+detectado y la cantidad de corridas consecutivas sin cambios.
+
+Si una URL fue leída correctamente pero no tuvo cambios detectados durante 30
+días o más, aparece en la sección **Revisar manualmente** de la interfaz.
+Esto permite detectar sitios que movieron su contenido aunque la URL original
+siga respondiendo sin novedades.
+
 ## Estrategia de monitoreo
 
 - **Método principal**: `requests` + `BeautifulSoup` para sitios estáticos

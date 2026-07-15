@@ -199,6 +199,7 @@
     /* Bar colors per section */
     .sec-changes .cpau-section-header__bar { background: var(--cpau-success); }
     .sec-new     .cpau-section-header__bar { background: var(--cpau-accent); }
+    .sec-review  .cpau-section-header__bar { background: var(--cpau-warning); }
     .sec-errors  .cpau-section-header__bar { background: var(--cpau-danger); }
 
     /* ── RUN PANEL ───────────────────────────────────────────── */
@@ -361,7 +362,8 @@
       color: var(--cpau-text-link-hover);
       text-decoration: underline;
     }
-    .result-item .error-detail {
+    .result-item .error-detail,
+    .result-item .result-meta {
       display: block;
       font-size: var(--cpau-text-xs);
       color: var(--cpau-text-secondary);
@@ -584,7 +586,19 @@
     </div>
   </div>
 
-  <!-- ── GESTIÓN DE URLs ────────────────────────────────────── -->
+  <!-- Revisar manualmente -->
+  <div class="card sec-review">
+    <div class="cpau-section-header">
+      <div class="cpau-section-header__bar"></div>
+      <span class="cpau-section-header__title">Revisar manualmente</span>
+      <span class="cpau-section-header__count" id="count-review">0</span>
+    </div>
+    <div class="result-list" id="list-review">
+      <div class="empty-msg">Sin URLs pendientes de revisión por antigüedad.</div>
+    </div>
+  </div>
+
+  <!-- Gestion de URLs -->
   <div class="card">
     <button class="url-manager-toggle" id="url-toggle" onclick="toggleUrlManager()">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
@@ -688,11 +702,11 @@
     fetch('/results').then(r => r.json()).then(d => {
       if (d.generated_at)
         document.getElementById('last-run').textContent = d.generated_at.replace('T', ' ');
-      renderResults(d.results || []);
+      renderResults(d.results || [], d.review_items || []);
     });
   }
 
-  function renderResults(results) {
+  function renderResults(results, reviewItems) {
     const changes  = results.filter(r => r.Resultado === 'Cambio detectado');
     const newItems = results.filter(r => r.Resultado === 'Nuevo (primer rastreo)');
     const errors   = results.filter(r => r.Resultado === 'Error de lectura');
@@ -700,9 +714,11 @@
     document.getElementById('count-changes').textContent = changes.length;
     document.getElementById('count-new').textContent     = newItems.length;
     document.getElementById('count-errors').textContent  = errors.length;
+    document.getElementById('count-review').textContent  = reviewItems.length;
 
     renderList('list-changes', changes,  'Sin cambios detectados.');
     renderList('list-new',     newItems, 'Ninguna.');
+    renderReviewList('list-review', reviewItems);
     renderList('list-errors',  errors,   'Sin errores.', true);
   }
 
@@ -717,8 +733,27 @@
     }).join('');
   }
 
+  function renderReviewList(id, items) {
+    const el = document.getElementById(id);
+    if (!items.length) {
+      el.innerHTML = '<div class="empty-msg">Sin URLs pendientes de revisión por antigüedad.</div>';
+      return;
+    }
+    el.innerHTML = items.map(r => {
+      const link = '<a href="' + r.URL + '" target="_blank">' + r.URL + '</a>';
+      const meta = r.DiasDesdeUltimoCambio + ' días sin cambios detectados · '
+        + r.CorridasSinCambios + ' corridas sin cambios · última lectura exitosa: '
+        + formatDateTime(r.UltimaLecturaExitosa);
+      return '<div class="result-item">' + link
+        + '<span class="result-meta">' + escHtml(meta) + '</span></div>';
+    }).join('');
+  }
   function escHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function formatDateTime(s) {
+    return s ? s.replace('T', ' ') : 'sin dato';
   }
 
   // ── GESTIÓN DE URLs ──────────────────────────────────────

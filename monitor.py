@@ -49,6 +49,7 @@ BASE_DIR = resolve_base_dir()
 
 URLS_FILE = BASE_DIR / 'urls.txt'
 HASHES_FILE = BASE_DIR / 'web_monitoring_hashes.json'
+METADATA_FILE = BASE_DIR / 'web_monitoring_metadata.json'
 RESULTS_FILE = BASE_DIR / 'last_run_results.json'
 
 DEFAULT_USER_AGENT = (
@@ -72,6 +73,7 @@ PAGE_GOTO_TIMEOUT_MS = 45000
 PAGE_IDLE_TIMEOUT_MS = 3000
 PAGE_TEXT_TIMEOUT_MS = 5000
 REQUEST_TEXT_MIN_CHARS = 80
+STALE_REVIEW_DAYS = 30
 
 # Dominios que usan Playwright como método primario (contenido dinámico o bloquean requests).
 # Se aplica extractor de títulos para evitar falsos positivos por ads/widgets.
@@ -172,6 +174,12 @@ def load_hashes():
     return {}
 
 
+def load_metadata():
+    if METADATA_FILE.exists():
+        return json.loads(METADATA_FILE.read_text(encoding='utf-8'))
+    return {}
+
+
 def save_hashes(hashes):
     HASHES_FILE.write_text(
         json.dumps(hashes, indent=2, ensure_ascii=False),
@@ -179,16 +187,95 @@ def save_hashes(hashes):
     )
 
 
-def save_results(results):
+def save_metadata(metadata):
+    METADATA_FILE.write_text(
+        json.dumps(metadata, indent=2, ensure_ascii=False),
+        encoding='utf-8',
+    )
+
+
+def parse_iso_datetime(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def days_since(value, now):
+    parsed = parse_iso_datetime(value)
+    if parsed is None:
+        return None
+    return (now - parsed).days
+
+
+def update_url_metadata(metadata, url, status, result, error_msg, now):
+    now_text = now.isoformat(timespec='seconds')
+    current = metadata.get(url, {})
+
+    current.setdefault('first_seen_at', now_text)
+    current['last_status'] = status
+    current['last_result'] = result
+    current['last_error'] = error_msg if status == 'Error' else ''
+
+    if status == 'Success':
+        current['last_success_at'] = now_text
+        current['consecutive_error_runs'] = 0
+
+        if result in ('Nuevo (primer rastreo)', 'Cambio detectado'):
+            current['last_change_at'] = now_text
+            current['consecutive_unchanged_runs'] = 0
+        else:
+            current['consecutive_unchanged_runs'] = (
+                int(current.get('consecutive_unchanged_runs', 0)) + 1
+            )
+    else:
+        current['consecutive_error_runs'] = (
+            int(current.get('consecutive_error_runs', 0)) + 1
+        )
+
+    metadata[url] = current
+
+
+def build_review_items(metadata, urls, now, stale_days=STALE_REVIEW_DAYS):
+    review_items = []
+    for url in urls:
+        item = metadata.get(url, {})
+        if item.get('last_status') != 'Success':
+            continue
+
+        last_change_at = item.get('last_change_at') or item.get('first_seen_at')
+        elapsed_days = days_since(last_change_at, now)
+        if elapsed_days is None or elapsed_days < stale_days:
+            continue
+
+        review_items.append({
+            'URL': url,
+            'DiasDesdeUltimoCambio': elapsed_days,
+            'UltimoCambio': last_change_at,
+            'UltimaLecturaExitosa': item.get('last_success_at', ''),
+            'CorridasSinCambios': int(item.get('consecutive_unchanged_runs', 0)),
+            'Motivo': f'Sin cambios detectados hace {elapsed_days} dias',
+        })
+
+    return sorted(
+        review_items,
+        key=lambda row: row['DiasDesdeUltimoCambio'],
+        reverse=True,
+    )
+
+
+def save_results(results, review_items=None):
     payload = {
         'generated_at': datetime.now().isoformat(timespec='seconds'),
         'results': results,
+        'review_items': review_items or [],
     }
     RESULTS_FILE.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False),
         encoding='utf-8',
     )
-
 
 def get_requests_session():
     session = requests.Session()
@@ -583,6 +670,8 @@ async def process_urls(urls, on_progress=None, on_playwright_status=None):
 def run_monitor(on_progress=None, on_playwright_status=None):
     urls = load_urls()
     previous_hashes = load_hashes()
+    metadata = load_metadata()
+    run_started_at = datetime.now()
     new_hashes = previous_hashes.copy()
 
     raw_results = asyncio.run(
@@ -610,10 +699,15 @@ def run_monitor(on_progress=None, on_playwright_status=None):
                 row['Resultado'] = 'Sin cambios'
         else:
             row['Resultado'] = 'Error de lectura'
+        update_url_metadata(
+            metadata, url, status, row['Resultado'], row['Error'], run_started_at
+        )
         processed_data.append(row)
 
+    review_items = build_review_items(metadata, urls, run_started_at)
     save_hashes(new_hashes)
-    save_results(processed_data)
+    save_metadata(metadata)
+    save_results(processed_data, review_items)
     return processed_data
 
 

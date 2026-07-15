@@ -12,7 +12,6 @@ https://colegioinmobiliario.org.ar/institucional/observatorio-estadistico
 https://www.afcp.org.ar/despacho-mensual
 https://www.indec.gob.ar/indec/web/Nivel3-Tema-3-3
 https://www.remax.com.ar/indice-remax
-https://www.ieric.org.ar/estadistica/informes-de-coyuntura/?2026
 https://www.uade.edu.ar/sites/investigacion/instituto-de-economia-ineco/informes-y-novedades/mei-informe-del-mercado-inmobiliario-e-indice-del-salario-real/
 https://www.nmrk.com.ar/informe/11170/reportes-de-mercado-2026
 https://www.fabianachaval.com/blog
@@ -32,3 +31,4 @@ https://www.zonaprop.com.ar/blog/zpindex/informe-demanda/
 https://www.colegio-escribanos.org.ar/category/estadisticas-de-escrituras/
 https://www.colegio-escribanos.org.ar/noticias-2/
 https://fabianachaval.com/radar/
+https://www.ieric.org.ar/estadistica/informes-de-coyuntura/
