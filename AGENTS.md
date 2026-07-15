@@ -86,11 +86,10 @@ Criterio de respuesta:
 
 Flujo de publicación en GitHub:
 - Después de realizar un cambio o ajuste en archivos del proyecto, preguntar explícitamente a la persona usuaria si quiere publicar los cambios en GitHub.
-- Si la persona usuaria confirma la publicación, usar el complemento de GitHub y/o `git` local para preparar commit, push y pull request.
+- Si la persona usuaria confirma la publicación, preparar commit y hacer push directo a `main`.
 - Antes de commitear, revisar `git status` y `git diff`, e indicar qué archivos se incluirán.
 - No incluir cambios no relacionados con la tarea actual.
 - Ejecutar las pruebas o verificaciones razonables antes de publicar, y aclarar si alguna no pudo ejecutarse.
 - Crear commits con mensajes claros y descriptivos.
-- Usar ramas con prefijo `codex/`, salvo que la persona usuaria indique otro nombre.
-- Abrir el pull request como borrador cuando los cambios requieran revisión manual posterior; abrirlo listo para revisión solo si la persona usuaria lo pide explícitamente.
-- No hacer `push` ni crear PR sin una instrucción explícita de publicación.
+- No crear ramas auxiliares ni pull requests como flujo normal, salvo que la persona usuaria lo pida explícitamente.
+- No hacer `push` sin una instrucción explícita de publicación.
