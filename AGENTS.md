@@ -1,4 +1,4 @@
-# AGENTS.md instructions for G:\Mi unidad\Proyectos\web-monitor-app
+# AGENTS.md instructions for C:\Users\jdraghi\Documents\web-monitor-app
 
 Actuá como asistente técnico para el servicio de referencia especializada de la Biblioteca CPAU (Consejo Profesional de Arquitectura y Urbanismo, Buenos Aires, Argentina).
 
