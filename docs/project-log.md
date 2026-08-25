@@ -6,6 +6,31 @@ origino, la solucion aplicada y las verificaciones realizadas.
 Para decisiones tecnicas con alternativas o consecuencias relevantes, crear
 ademas un ADR en `docs/adr/`.
 
+## 2026-08-25 - Actualizar fuentes monitoreadas
+
+**Problema**
+
+La lista activa de URLs necesitaba actualizar la fuente del Codigo Urbanistico
+y de Edificacion e incorporar una nueva fuente de informes inmobiliarios.
+
+**Cambio aplicado**
+
+- Se retiro la URL anterior del Codigo Urbanistico y de Edificacion.
+- Se incorporo la ruta correspondiente dentro del sitio historico del GCABA.
+- Se agrego la pagina de reportes especiales 2026 de NMRK.
+
+**Motivo**
+
+Mantener la configuracion del monitoreo alineada con las fuentes que se quieren
+seguir actualmente.
+
+**Verificacion**
+
+- Se comprobaron 35 URLs no vacias.
+- Todas tienen formato absoluto HTTP o HTTPS.
+- No se detectaron URLs duplicadas.
+- `git diff --check`.
+
 ## 2026-07-15 - Adoptar interfaz operativa neutra
 
 **Problema**
