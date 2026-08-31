@@ -36,10 +36,16 @@
             <span class="eyebrow">Última corrida completada</span>
             <span class="run-date" id="last-run">Sin corridas registradas</span>
           </div>
-          <button class="button" id="btn-run" type="button" onclick="startRun()">
-            <span aria-hidden="true">▶</span>
-            <span id="btn-run-label">Ejecutar monitoreo</span>
-          </button>
+          <div class="run-actions">
+            <button class="button" id="btn-run" type="button" onclick="startRun()" disabled>
+              <span aria-hidden="true">▶</span>
+              <span id="btn-run-label">Verificando estado…</span>
+            </button>
+            <button class="button button--cancel" id="btn-cancel" type="button" onclick="cancelRun()" hidden>
+              <span aria-hidden="true">■</span>
+              <span id="btn-cancel-label">Cancelar corrida</span>
+            </button>
+          </div>
         </div>
         <span class="pw-badge pw-none" id="pw-badge" role="status" aria-live="polite"></span>
         <div class="progress-wrap" id="progress-wrap">
@@ -48,6 +54,7 @@
           </div>
           <span class="progress-label" id="progress-label">Preparando fuentes…</span>
         </div>
+        <span class="run-message" id="run-message" role="status" aria-live="polite" hidden></span>
       </div>
     </section>
 
@@ -66,11 +73,11 @@
       </div>
       <div class="metric metric--warning">
         <span class="metric__value" id="count-review">0</span>
-        <span class="metric__label">Revisión manual</span>
+        <span class="metric__label">Revisión por antigüedad</span>
       </div>
       <div class="metric metric--danger">
         <span class="metric__value" id="count-errors">0</span>
-        <span class="metric__label">Errores de lectura</span>
+        <span class="metric__label">No verificadas</span>
       </div>
     </section>
 
@@ -102,7 +109,7 @@
           <details class="compact-panel" id="panel-review" open>
             <summary class="compact-panel__header">
               <span class="state-icon state-icon--warning" aria-hidden="true">!</span>
-              <span class="panel-title">Revisar manualmente</span>
+              <span class="panel-title">Revisión por antigüedad</span>
               <span class="count-badge" aria-hidden="true" id="count-review-panel">0</span>
             </summary>
             <div class="result-list" id="list-review">
@@ -121,10 +128,10 @@
             </div>
           </details>
 
-          <details class="compact-panel" id="panel-errors">
+          <details class="compact-panel" id="panel-errors" open>
             <summary class="compact-panel__header">
               <span class="state-icon state-icon--danger" aria-hidden="true">×</span>
-              <span class="panel-title">Errores de lectura</span>
+              <span class="panel-title">No verificadas</span>
               <span class="count-badge" aria-hidden="true" id="count-errors-panel">0</span>
             </summary>
             <div class="result-list" id="list-errors">
@@ -180,57 +187,152 @@
   <script>
     let pollTimer = null;
     let urlsDirty = false;
+    let lastKnownRunState = 'idle';
 
-    window.addEventListener('load', loadResults);
+    window.addEventListener('load', initializePage);
+
+    function initializePage() {
+      loadResults();
+      syncRunState();
+    }
+
+    function syncRunState() {
+      fetch('/status')
+        .then(async response => {
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'No se pudo consultar el estado.');
+          applyRunStatus(data);
+        })
+        .catch(error => {
+          stopPolling();
+          resetRunControls();
+          showRunMessage(error.message || 'No se pudo consultar el estado.', 'error');
+        });
+    }
 
     function startRun() {
-      const button = document.getElementById('btn-run');
-      button.disabled = true;
-      document.getElementById('btn-run-label').textContent = 'Ejecutando…';
+      setRunningControls(false);
+      showRunMessage('Iniciando monitoreo…', 'info');
       document.getElementById('progress-wrap').style.display = 'block';
       setProgress(0, 'Iniciando…');
 
       fetch('/run', { method: 'POST' })
         .then(async response => {
           const data = await response.json();
-          if (!response.ok || data.error) throw new Error(data.error || 'No se pudo iniciar el monitoreo.');
-          pollTimer = setInterval(pollStatus, 600);
+          if (!response.ok || data.error) {
+            throw new Error(data.error || 'No se pudo iniciar el monitoreo.');
+          }
+          lastKnownRunState = 'running';
+          pollStatus();
+          startPolling();
         })
         .catch(error => {
-          resetRunControls();
-          showPwBadge(false, error.message);
+          showRunMessage(error.message, 'error');
+          syncRunState();
         });
+    }
+
+    function cancelRun() {
+      const button = document.getElementById('btn-cancel');
+      button.disabled = true;
+      document.getElementById('btn-cancel-label').textContent = 'Cancelando…';
+      showRunMessage('Solicitando cancelación…', 'warning');
+
+      fetch('/cancel', { method: 'POST' })
+        .then(async response => {
+          const data = await response.json();
+          if (!response.ok || data.error) {
+            throw new Error(data.error || 'No se pudo cancelar la corrida.');
+          }
+          pollStatus();
+          startPolling();
+        })
+        .catch(error => {
+          showRunMessage(error.message, 'error');
+          syncRunState();
+        });
+    }
+
+    function startPolling() {
+      if (pollTimer === null) pollTimer = setInterval(pollStatus, 600);
+    }
+
+    function stopPolling() {
+      if (pollTimer !== null) clearInterval(pollTimer);
+      pollTimer = null;
     }
 
     function pollStatus() {
       fetch('/status')
-        .then(response => response.json())
-        .then(data => {
-          if (data.playwright_available === true) showPwBadge(true, '');
-          if (data.playwright_available === false) showPwBadge(false, data.playwright_message);
-
-          const percentage = data.total > 0 ? Math.round(data.current / data.total * 100) : 0;
-          const label = data.url
-            ? data.current + '/' + data.total + ' · ' + data.url.replace(/^https?:\/\//, '')
-            : data.current + '/' + data.total;
-          setProgress(percentage, label);
-
-          if (!data.running) {
-            clearInterval(pollTimer);
-            resetRunControls();
-            loadResults();
-          }
+        .then(async response => {
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'No se pudo consultar el estado.');
+          applyRunStatus(data);
         })
         .catch(error => {
-          clearInterval(pollTimer);
+          stopPolling();
           resetRunControls();
-          showPwBadge(false, error.message || 'No se pudo consultar el estado.');
+          showRunMessage(error.message || 'No se pudo consultar el estado.', 'error');
         });
+    }
+
+    function applyRunStatus(data) {
+      if (data.playwright_available === true) showPwBadge(true, '');
+      if (data.playwright_available === false) showPwBadge(false, data.playwright_message);
+
+      const runStateChanged = data.run_state !== lastKnownRunState;
+      lastKnownRunState = data.run_state || 'idle';
+
+      if (data.running) {
+        setRunningControls(Boolean(data.cancel_requested));
+        document.getElementById('progress-wrap').style.display = 'block';
+        const percentage = data.total > 0 ? Math.round(data.current / data.total * 100) : 0;
+        const label = data.url
+          ? data.current + '/' + data.total + ' · ' + data.url.replace(/^https?:\/\//, '')
+          : data.current + '/' + data.total;
+        setProgress(percentage, label);
+        showRunMessage(
+          data.message || 'Monitoreo en curso.',
+          data.cancel_requested ? 'warning' : 'info'
+        );
+        startPolling();
+        return;
+      }
+
+      stopPolling();
+      resetRunControls();
+      if (data.run_state === 'completed') {
+        showRunMessage(data.message || 'Corrida finalizada.', 'success');
+        if (runStateChanged) loadResults();
+      } else if (data.run_state === 'cancelled') {
+        showRunMessage(data.message || 'Corrida cancelada.', 'warning');
+      } else if (data.run_state === 'failed') {
+        showRunMessage(data.message || 'La corrida se interrumpió.', 'error');
+      } else if (data.message) {
+        showRunMessage(data.message, 'info');
+      } else {
+        showRunMessage('', '');
+      }
+    }
+
+    function setRunningControls(cancelRequested) {
+      document.getElementById('btn-run').disabled = true;
+      document.getElementById('btn-run-label').textContent = 'Ejecutando…';
+      const cancelButton = document.getElementById('btn-cancel');
+      cancelButton.hidden = false;
+      cancelButton.disabled = cancelRequested;
+      document.getElementById('btn-cancel-label').textContent = cancelRequested
+        ? 'Cancelando…'
+        : 'Cancelar corrida';
     }
 
     function resetRunControls() {
       document.getElementById('btn-run').disabled = false;
       document.getElementById('btn-run-label').textContent = 'Ejecutar monitoreo';
+      const cancelButton = document.getElementById('btn-cancel');
+      cancelButton.hidden = true;
+      cancelButton.disabled = false;
+      document.getElementById('btn-cancel-label').textContent = 'Cancelar corrida';
       document.getElementById('progress-wrap').style.display = 'none';
     }
 
@@ -238,6 +340,13 @@
       document.getElementById('progress-fill').style.width = percentage + '%';
       document.querySelector('.progress-track').setAttribute('aria-valuenow', percentage);
       document.getElementById('progress-label').textContent = label;
+    }
+
+    function showRunMessage(message, kind) {
+      const element = document.getElementById('run-message');
+      element.textContent = message || '';
+      element.hidden = !message;
+      element.className = 'run-message' + (kind ? ' run-message--' + kind : '');
     }
 
     function showPwBadge(ok, message) {
@@ -282,14 +391,20 @@
       renderList('list-changes', changes, 'Sin cambios detectados.');
       renderList('list-new', newItems, 'Ninguna fuente en primer rastreo.');
       renderReviewList('list-review', reviewItems);
-      renderList('list-errors', errors, 'Sin errores de lectura.', true);
+      renderList(
+        'list-errors',
+        errors,
+        'Todas las fuentes pudieron verificarse.',
+        true,
+        'Revisar fuente ↗'
+      );
     }
 
     function setCount(id, value) {
       document.getElementById(id).textContent = value;
     }
 
-    function renderList(id, items, emptyMessage, showError = false) {
+    function renderList(id, items, emptyMessage, showError = false, actionLabel = 'Abrir fuente ↗') {
       const element = document.getElementById(id);
       if (!items.length) {
         element.innerHTML = '<div class="empty-msg">' + escHtml(emptyMessage) + '</div>';
@@ -301,7 +416,7 @@
         const error = showError && item.Error
           ? '<span class="error-detail">' + escHtml(item.Error) + '</span>'
           : '';
-        return resultItemHtml(url, error);
+        return resultItemHtml(url, error, actionLabel);
       }).join('');
     }
 
@@ -320,7 +435,7 @@
       }).join('');
     }
 
-    function resultItemHtml(url, detailHtml) {
+    function resultItemHtml(url, detailHtml, actionLabel = 'Abrir fuente ↗') {
       const safeUrl = safeExternalUrl(url);
       return '<div class="result-item">'
         + '<div class="result-source">'
@@ -328,7 +443,7 @@
         + '<span class="source-url">' + escHtml(stripProtocol(url)) + '</span>'
         + detailHtml
         + '</div>'
-        + '<a class="source-action" href="' + escAttr(safeUrl) + '" target="_blank" rel="noopener noreferrer">Abrir fuente ↗</a>'
+        + '<a class="source-action" href="' + escAttr(safeUrl) + '" target="_blank" rel="noopener noreferrer">' + escHtml(actionLabel) + '</a>'
         + '</div>';
     }
 

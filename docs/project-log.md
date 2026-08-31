@@ -6,6 +6,55 @@ origino, la solucion aplicada y las verificaciones realizadas.
 Para decisiones tecnicas con alternativas o consecuencias relevantes, crear
 ademas un ADR en `docs/adr/`.
 
+## 2026-08-31 - Controlar corridas prolongadas y permitir cancelarlas
+
+**Problema**
+
+Una fuente podia dejar la corrida bloqueada indefinidamente. Recargar la pagina
+no detenia el proceso y un nuevo intento respondia que ya habia una corrida en
+curso. Ademas, no existia una indicacion operativa clara de las fuentes que no
+pudieron verificarse.
+
+**Cambio aplicado**
+
+- Se incorporo un limite de 120 segundos para el procesamiento completo de cada
+  fuente.
+- Los timeouts y errores inesperados se registran como fuentes no verificadas y
+  el monitoreo continua con la fuente siguiente.
+- Se agrego cancelacion cooperativa mediante `POST /cancel` y un boton visible
+  durante la corrida.
+- La interfaz recupera el estado activo despues de una recarga.
+- Las fuentes fallidas se muestran en **No verificadas**, con el motivo y un
+  enlace para revisarlas manualmente.
+- Una cancelacion conserva los hashes, metadatos y resultados de la ultima
+  corrida completa.
+- Se recompilo `dist/MonitoreoWeb/MonitoreoWeb.exe` con los cambios.
+
+**Motivo**
+
+Evitar que una pagina problematica detenga todo el lote y ofrecer una salida
+segura cuando una corrida deja de ser util o parece bloqueada.
+
+**Verificacion**
+
+- Ocho pruebas automatizadas: timeout con continuidad, cancelacion, excepcion
+  inesperada, preservacion de datos, cierre de Playwright y endpoints de control.
+- Validacion de sintaxis Python y `git diff --check`.
+- Pruebas reales de navegador a 1280 y 360 px sin errores de consola ni
+  desbordamiento horizontal.
+- Simulacion de corrida activa con recuperacion tras recarga y cancelacion
+  desde la interfaz.
+- Recompilacion aislada con PyInstaller y prueba de humo del ejecutable sobre
+  `/status`, la plantilla, las 35 URLs y la ruta activa de `urls.txt`.
+- Una corrida real revelo un error al cerrar Playwright. Se separaron el
+  administrador de contexto y la instancia activa, y se agrego una prueba de
+  regresion que verifica el cierre correcto. La version compilada completo el
+  mismo ciclo con Playwright real y una lista temporal vacia.
+
+**ADR relacionado**
+
+- `docs/adr/0006-controlar-corridas-prolongadas-y-cancelacion.md`
+
 ## 2026-08-25 - Actualizar fuentes monitoreadas
 
 **Problema**

@@ -4,11 +4,19 @@ import sys
 import threading
 import time
 import webbrowser
+from datetime import datetime
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
 
-from monitor import RESULTS_FILE, URLS_FILE, load_urls, run_monitor, save_urls as write_urls
+from monitor import (
+    RESULTS_FILE,
+    URLS_FILE,
+    RunCancelled,
+    load_urls,
+    run_monitor,
+    save_urls as write_urls,
+)
 
 # ── Path handling: dev vs ejecutable PyInstaller ────────────────────────────
 # sys._MEIPASS  → donde PyInstaller extrajo los assets (templates, static)
@@ -31,15 +39,25 @@ else:
     app = Flask(__name__)
 
 _state_lock = threading.Lock()
+_cancel_event = threading.Event()
 _state = {
     'running': False,
+    'cancel_requested': False,
+    'run_state': 'idle',
+    'message': '',
     'current': 0,
     'total': 0,
     'url': '',
     'playwright_available': None,
     'playwright_message': '',
+    'started_at': '',
+    'last_progress_at': '',
     'finished_at': '',
 }
+
+
+def _timestamp():
+    return datetime.now().isoformat(timespec='seconds')
 
 
 @app.route('/')
@@ -52,12 +70,18 @@ def run():
     with _state_lock:
         if _state['running']:
             return jsonify({'error': 'Ya hay una corrida en curso'}), 409
+        _cancel_event.clear()
         _state['running'] = True
+        _state['cancel_requested'] = False
+        _state['run_state'] = 'running'
+        _state['message'] = 'Monitoreo en curso.'
         _state['current'] = 0
         _state['total'] = len(load_urls())
         _state['url'] = ''
         _state['playwright_available'] = None
         _state['playwright_message'] = ''
+        _state['started_at'] = _timestamp()
+        _state['last_progress_at'] = _state['started_at']
         _state['finished_at'] = ''
 
     def worker():
@@ -66,6 +90,7 @@ def run():
                 _state['current'] = current
                 _state['total'] = total
                 _state['url'] = url
+                _state['last_progress_at'] = _timestamp()
 
         def on_playwright_status(available, msg):
             with _state_lock:
@@ -76,16 +101,41 @@ def run():
             run_monitor(
                 on_progress=on_progress,
                 on_playwright_status=on_playwright_status,
+                should_cancel=_cancel_event.is_set,
             )
-        except Exception:
-            pass
+            outcome = 'completed'
+            message = 'Corrida finalizada.'
+        except RunCancelled:
+            outcome = 'cancelled'
+            message = 'Corrida cancelada. Se conservaron los resultados anteriores.'
+        except Exception as exc:
+            logging.exception('La corrida de monitoreo se interrumpió')
+            outcome = 'failed'
+            message = f'La corrida se interrumpió: {exc}'
         finally:
             with _state_lock:
                 _state['running'] = False
-                _state['finished_at'] = __import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M')
+                _state['cancel_requested'] = False
+                _state['run_state'] = outcome
+                _state['message'] = message
+                _state['url'] = ''
+                _state['finished_at'] = _timestamp()
+            _cancel_event.clear()
 
-    threading.Thread(target=worker, daemon=True).start()
+    threading.Thread(target=worker, name='web-monitor-run', daemon=True).start()
     return jsonify({'status': 'started'})
+
+
+@app.route('/cancel', methods=['POST'])
+def cancel():
+    with _state_lock:
+        if not _state['running']:
+            return jsonify({'error': 'No hay una corrida en curso'}), 409
+        _cancel_event.set()
+        _state['cancel_requested'] = True
+        _state['run_state'] = 'cancelling'
+        _state['message'] = 'Cancelación solicitada. Cerrando la fuente actual…'
+        return jsonify({'status': 'cancelling'}), 202
 
 
 @app.route('/status')

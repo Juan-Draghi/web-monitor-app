@@ -74,6 +74,26 @@ PAGE_IDLE_TIMEOUT_MS = 3000
 PAGE_TEXT_TIMEOUT_MS = 5000
 REQUEST_TEXT_MIN_CHARS = 80
 STALE_REVIEW_DAYS = 30
+URL_PROCESS_TIMEOUT_SECONDS = 120
+CANCEL_POLL_INTERVAL_SECONDS = 0.25
+PLAYWRIGHT_CLOSE_TIMEOUT_SECONDS = 5
+PLAYWRIGHT_LAUNCH_TIMEOUT_SECONDS = 30
+
+
+class RunCancelled(Exception):
+    """Indica una cancelación solicitada por la persona usuaria."""
+
+
+async def _await_quietly(awaitable, timeout=PLAYWRIGHT_CLOSE_TIMEOUT_SECONDS):
+    """Espera una limpieza asíncrona sin permitir que bloquee la corrida."""
+    try:
+        await asyncio.wait_for(awaitable, timeout=timeout)
+    except asyncio.CancelledError:
+        pass
+    except Exception:
+        pass
+
+
 
 # Dominios que usan Playwright como método primario (contenido dinámico o bloquean requests).
 # Se aplica extractor de títulos para evitar falsos positivos por ads/widgets.
@@ -436,15 +456,9 @@ async def fetch_gdrive_folder_playwright(browser, url):
         return url, 'Error', '', f'Drive error: {exc}'
     finally:
         if page:
-            try:
-                await page.close()
-            except Exception:
-                pass
+            await _await_quietly(page.close())
         if context:
-            try:
-                await context.close()
-            except Exception:
-                pass
+            await _await_quietly(context.close())
 
 
 # ---------------------------------------------------------------------------
@@ -503,15 +517,9 @@ async def _playwright_get_html(browser, url):
         return None, str(exc)
     finally:
         if page:
-            try:
-                await page.close()
-            except Exception:
-                pass
+            await _await_quietly(page.close())
         if context:
-            try:
-                await context.close()
-            except Exception:
-                pass
+            await _await_quietly(context.close())
 
 
 async def fetch_with_playwright_smart(browser, url):
@@ -620,54 +628,143 @@ async def fetch_url(session, url, browser=None):
 # Procesamiento batch
 # ---------------------------------------------------------------------------
 
-async def process_urls(urls, on_progress=None, on_playwright_status=None):
+async def _cancel_task(task):
+    task.cancel()
+    try:
+        await asyncio.wait_for(task, timeout=PLAYWRIGHT_CLOSE_TIMEOUT_SECONDS)
+    except asyncio.CancelledError:
+        pass
+    except Exception:
+        pass
+
+
+async def _fetch_url_with_controls(
+    session,
+    url,
+    browser,
+    should_cancel,
+    timeout=URL_PROCESS_TIMEOUT_SECONDS,
+):
+    task = asyncio.create_task(fetch_url(session, url, browser=browser))
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+
+    while True:
+        if should_cancel():
+            await _cancel_task(task)
+            raise RunCancelled()
+
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            await _cancel_task(task)
+            return (
+                url,
+                'Error',
+                '',
+                f'Tiempo máximo de {timeout:g} segundos excedido. '
+                'La fuente requiere revisión manual.',
+            )
+
+        done, _ = await asyncio.wait(
+            {task},
+            timeout=min(CANCEL_POLL_INTERVAL_SECONDS, remaining),
+        )
+        if task not in done:
+            continue
+
+        try:
+            return task.result()
+        except Exception as exc:
+            return url, 'Error', '', f'Error inesperado: {exc}'
+
+
+async def process_urls(
+    urls,
+    on_progress=None,
+    on_playwright_status=None,
+    should_cancel=None,
+    per_url_timeout=URL_PROCESS_TIMEOUT_SECONDS,
+):
     session = get_requests_session()
     results = []
+    should_cancel = should_cancel or (lambda: False)
 
     browser = None
-    playwright_ctx = None
-
-    # Siempre lanzar Playwright: necesario para los dominios primarios
-    if async_playwright is None:
-        if on_playwright_status:
-            on_playwright_status(False, 'Paquete playwright no instalado. Re-ejecutá instalar.bat.')
-    else:
-        try:
-            playwright_ctx = await async_playwright().__aenter__()
-            browser = await playwright_ctx.chromium.launch(
-                headless=True, args=PLAYWRIGHT_LAUNCH_ARGS
-            )
-            if on_playwright_status:
-                on_playwright_status(True, '')
-        except Exception as exc:
-            browser = None
-            if on_playwright_status:
-                on_playwright_status(False, f'No se pudo iniciar Chromium: {exc}. Re-ejecutá instalar.bat.')
+    playwright_manager = None
+    playwright_instance = None
 
     try:
+        if should_cancel():
+            raise RunCancelled()
+
+        # Siempre lanzar Playwright: necesario para los dominios primarios.
+        if async_playwright is None:
+            if on_playwright_status:
+                on_playwright_status(
+                    False,
+                    'Paquete playwright no instalado. Re-ejecutá instalar.bat.',
+                )
+        else:
+            try:
+                playwright_manager = async_playwright()
+                playwright_instance = await asyncio.wait_for(
+                    playwright_manager.__aenter__(),
+                    timeout=PLAYWRIGHT_LAUNCH_TIMEOUT_SECONDS,
+                )
+                browser = await asyncio.wait_for(
+                    playwright_instance.chromium.launch(
+                        headless=True,
+                        args=PLAYWRIGHT_LAUNCH_ARGS,
+                    ),
+                    timeout=PLAYWRIGHT_LAUNCH_TIMEOUT_SECONDS,
+                )
+                if on_playwright_status:
+                    on_playwright_status(True, '')
+            except Exception as exc:
+                browser = None
+                if on_playwright_status:
+                    on_playwright_status(
+                        False,
+                        f'No se pudo iniciar Chromium: {exc}. Re-ejecutá instalar.bat.',
+                    )
+
         for index, url in enumerate(urls, start=1):
+            if should_cancel():
+                raise RunCancelled()
             if on_progress:
                 on_progress(index - 1, len(urls), url)
-            result = await fetch_url(session, url, browser=browser)
+
+            result = await _fetch_url_with_controls(
+                session,
+                url,
+                browser,
+                should_cancel,
+                timeout=per_url_timeout,
+            )
             results.append(result)
+
+        if should_cancel():
+            raise RunCancelled()
         if on_progress:
             on_progress(len(urls), len(urls), '')
+        return results
     finally:
+        session.close()
         if browser:
-            try:
-                await browser.close()
-            except Exception:
-                pass
-        if playwright_ctx:
-            try:
-                await playwright_ctx.__aexit__(None, None, None)
-            except Exception:
-                pass
-
-    return results
+            await _await_quietly(browser.close())
+        if playwright_manager:
+            await _await_quietly(
+                playwright_manager.__aexit__(None, None, None)
+            )
 
 
-def run_monitor(on_progress=None, on_playwright_status=None):
+def run_monitor(
+    on_progress=None,
+    on_playwright_status=None,
+    should_cancel=None,
+    per_url_timeout=URL_PROCESS_TIMEOUT_SECONDS,
+):
+    should_cancel = should_cancel or (lambda: False)
     urls = load_urls()
     previous_hashes = load_hashes()
     metadata = load_metadata()
@@ -675,11 +772,21 @@ def run_monitor(on_progress=None, on_playwright_status=None):
     new_hashes = previous_hashes.copy()
 
     raw_results = asyncio.run(
-        process_urls(urls, on_progress=on_progress, on_playwright_status=on_playwright_status)
+        process_urls(
+            urls,
+            on_progress=on_progress,
+            on_playwright_status=on_playwright_status,
+            should_cancel=should_cancel,
+            per_url_timeout=per_url_timeout,
+        )
     )
+    if should_cancel():
+        raise RunCancelled()
 
     processed_data = []
     for url, status, text, error_msg in raw_results:
+        if should_cancel():
+            raise RunCancelled()
         row = {
             'URL': url,
             'Estado': status,
@@ -705,6 +812,8 @@ def run_monitor(on_progress=None, on_playwright_status=None):
         processed_data.append(row)
 
     review_items = build_review_items(metadata, urls, run_started_at)
+    if should_cancel():
+        raise RunCancelled()
     save_hashes(new_hashes)
     save_metadata(metadata)
     save_results(processed_data, review_items)

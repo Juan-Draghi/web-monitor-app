@@ -85,9 +85,29 @@ Ese archivo registra, por URL, la última lectura exitosa, el último cambio
 detectado y la cantidad de corridas consecutivas sin cambios.
 
 Si una URL fue leída correctamente pero no tuvo cambios detectados durante 30
-días o más, aparece en la sección **Revisar manualmente** de la interfaz.
+días o más, aparece en la sección **Revisión por antigüedad** de la interfaz.
 Esto permite detectar sitios que movieron su contenido aunque la URL original
 siga respondiendo sin novedades.
+
+## Cancelación y fuentes no verificadas
+
+Cada fuente dispone de un máximo de 120 segundos para completar su lectura. Si
+ese tiempo se agota o se produce un error inesperado, la aplicación registra la
+página como **No verificada**, continúa con la fuente siguiente y ofrece un
+enlace para revisarla manualmente.
+
+Mientras hay una corrida activa, la interfaz muestra el botón **Cancelar
+corrida**. La cancelación puede tardar unos segundos mientras se cierra el
+navegador de la fuente actual. Una corrida cancelada no reemplaza los hashes,
+metadatos ni resultados de la última ejecución completa.
+
+Si se recarga la página durante una corrida, la interfaz consulta el estado del
+servidor y recupera automáticamente el progreso y el control de cancelación.
+Recargar el navegador por sí solo no detiene el proceso.
+
+Los errores y timeouts se muestran en **No verificadas** con su causa. Esas
+páginas deben abrirse y consultarse manualmente cuando la información sea
+necesaria.
 
 ## Estrategia de monitoreo
 
