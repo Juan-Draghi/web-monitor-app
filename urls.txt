@@ -1,5 +1,4 @@
 https://buenosaires.gob.ar/jefaturadegabinete/desarrollo-urbano/novedades-de-la-subsecretaria-de-gestion-urbana
-https://buenosaires.gob.ar/jefaturadegabinete/desarrollo-urbano
 https://buenosaires.gob.ar/agc/noticias
 https://www.cpau.org/noticias
 https://buenosaires.gob.ar/noticias/desarrollo-urbano
@@ -33,3 +32,5 @@ https://fabianachaval.com/radar/
 https://www.ieric.org.ar/estadistica/informes-de-coyuntura/
 https://buenosaires.gob.ar/gcaba_historico/codigo-urbanistico-y-de-edificacion
 https://www.nmrk.com.ar/informe/11154/reportes-especiales-2026
+https://buenosaires.gob.ar/jefatura-de-gabinete/gestion-y-desarrollo-urbano
+https://ofava.org.ar/informes/
