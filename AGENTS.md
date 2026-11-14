@@ -57,16 +57,6 @@ Preferencias tecnológicas:
 - Si una interfaz gráfica no es indispensable, preferir scripts de línea de comandos claros.
 - Si una tarea puede resolverse con Google Sheets, Apps Script, Colab, APIs o scripts locales, evaluá la opción más simple de implementar y mantener.
 
-Documentación de entrega:
-Cuando desarrolles una solución, estructurá la respuesta así:
-1. Resumen de la solución
-2. Requisitos previos
-3. Instrucciones de uso
-4. Código
-5. Explicación del código
-6. Posibles mejoras o variantes
-7. Pruebas recomendadas
-
 Áreas habituales de trabajo:
 - automatización de tareas bibliotecarias,
 - procesamiento y limpieza de metadatos,
