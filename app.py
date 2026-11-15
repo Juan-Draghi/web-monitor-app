@@ -4,7 +4,7 @@ import sys
 import threading
 import time
 import webbrowser
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
@@ -60,6 +60,42 @@ def _timestamp():
     return datetime.now().isoformat(timespec='seconds')
 
 
+# ── Aviso de repetición ─────────────────────────────────────────────────────
+# Si la última corrida completada terminó hace menos de este plazo, pedir
+# confirmación antes de iniciar otra. Exactamente al cumplirse el plazo ya no
+# se avisa. Las corridas canceladas o fallidas no cuentan: no guardan
+# resultados, así que no cambian la hora de referencia.
+REPEAT_WARNING_MINUTES = 60
+
+
+def _now():
+    return datetime.now()
+
+
+def get_last_completed_at():
+    """Hora en que se guardó la última corrida completada, o None si no hay."""
+    try:
+        data = json.loads(RESULTS_FILE.read_text(encoding='utf-8'))
+        return datetime.fromisoformat(data.get('generated_at') or '')
+    except (OSError, ValueError, TypeError, AttributeError):
+        return None
+
+
+def get_repeat_warning(now=None):
+    """Devuelve los datos del aviso si corresponde mostrarlo; si no, None."""
+    last_completed_at = get_last_completed_at()
+    if last_completed_at is None:
+        return None
+    elapsed = (now or _now()) - last_completed_at
+    if elapsed >= timedelta(minutes=REPEAT_WARNING_MINUTES):
+        return None
+    return {
+        'last_completed_at': last_completed_at.isoformat(timespec='seconds'),
+        'minutes_since': max(0, int(elapsed.total_seconds() // 60)),
+        'threshold_minutes': REPEAT_WARNING_MINUTES,
+    }
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -67,9 +103,18 @@ def index():
 
 @app.route('/run', methods=['POST'])
 def run():
+    body = request.get_json(silent=True) or {}
+    confirm_repeat = body.get('confirm_repeat') is True
+
     with _state_lock:
         if _state['running']:
             return jsonify({'error': 'Ya hay una corrida en curso'}), 409
+        if not confirm_repeat:
+            warning = get_repeat_warning()
+            if warning:
+                # No se inicia nada ni se toca ningún archivo hasta que la
+                # persona confirme desde la interfaz.
+                return jsonify({'confirmation_required': True, **warning}), 409
         _cancel_event.clear()
         _state['running'] = True
         _state['cancel_requested'] = False

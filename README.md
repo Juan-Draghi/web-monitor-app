@@ -109,6 +109,19 @@ Los errores y timeouts se muestran en **No verificadas** con su causa. Esas
 páginas deben abrirse y consultarse manualmente cuando la información sea
 necesaria.
 
+## Aviso de repetición
+
+Si se pide una nueva corrida cuando pasaron menos de 60 minutos desde que
+terminó la última corrida completada, la aplicación muestra un aviso y espera
+confirmación: **No ejecutar** deja todo como está; **Ejecutar igual** inicia la
+corrida. Las corridas canceladas o fallidas no cuentan para ese plazo.
+
+Los resultados de la última corrida completada se reemplazan solo cuando la
+nueva termina y se guarda correctamente. Si el guardado se interrumpe, la
+aplicación prioriza no perder novedades: en ese caso excepcional, la corrida
+siguiente puede volver a mostrar una novedad ya informada. Ver
+`docs/adr/0007-guardado-coherente-y-aviso-de-repeticion.md`.
+
 ## Estrategia de monitoreo
 
 - **Método principal**: `requests` + `BeautifulSoup` para sitios estáticos

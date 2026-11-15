@@ -391,6 +391,40 @@ h1 {
   background: var(--ui-danger-soft);
 }
 
+/* Aviso de repetición: pide confirmación antes de una corrida cercana. */
+.repeat-warning {
+  margin-top: 12px;
+  padding: 12px 14px;
+  color: var(--ui-ink);
+  background: var(--ui-warning-soft);
+  border: 1px solid var(--ui-warning);
+  border-radius: var(--ui-radius-control);
+}
+
+.repeat-warning[hidden] {
+  display: none;
+}
+
+.repeat-warning__title {
+  margin: 0 0 4px;
+  color: var(--ui-warning);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.repeat-warning__text {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.repeat-warning__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .metric-band {
   display: grid;
   grid-template-columns: 1.1fr repeat(4, minmax(0, 1fr));
@@ -858,6 +892,10 @@ h1 {
 
   .metric:nth-child(3) {
     border-top: 1px solid var(--ui-line);
+  }
+
+  .repeat-warning__actions {
+    flex-direction: column;
   }
 
   .section-heading,

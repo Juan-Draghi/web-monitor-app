@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -200,18 +201,96 @@ def load_metadata():
     return {}
 
 
-def save_hashes(hashes):
-    HASHES_FILE.write_text(
-        json.dumps(hashes, indent=2, ensure_ascii=False),
-        encoding='utf-8',
-    )
+# ---------------------------------------------------------------------------
+# Guardado de una corrida completada
+# ---------------------------------------------------------------------------
+# Se guardan tres archivos: resultados (lo que muestra la pantalla), metadatos
+# (fechas y contadores por URL) y referencias de comparación (hashes).
+#
+# Paso 1: se escribe cada archivo nuevo en un borrador "<nombre>.tmp". Si algo
+#         falla acá, se borran los borradores y no se toca ningún archivo real.
+# Paso 2: se reemplaza cada archivo real por su borrador. Cada reemplazo es
+#         instantáneo y nunca deja un archivo escrito a medias.
+#
+# Orden del paso 2: resultados -> metadatos -> referencias. Si el proceso se
+# corta entre reemplazos, la corrida siguiente puede volver a mostrar una
+# novedad ya detectada, pero nunca la pierde (decisión del 2026-11-15).
+
+SAVE_REPLACE_ATTEMPTS = 5
+SAVE_REPLACE_RETRY_SECONDS = 0.2
 
 
-def save_metadata(metadata):
-    METADATA_FILE.write_text(
-        json.dumps(metadata, indent=2, ensure_ascii=False),
-        encoding='utf-8',
-    )
+def _temp_path_for(target):
+    return target.with_name(target.name + '.tmp')
+
+
+def _write_temp_json(target, data):
+    """Escribe el borrador de un archivo JSON y lo fuerza al disco."""
+    temp_path = _temp_path_for(target)
+    with open(temp_path, 'w', encoding='utf-8') as handle:
+        handle.write(json.dumps(data, indent=2, ensure_ascii=False))
+        handle.flush()
+        _os.fsync(handle.fileno())
+    return temp_path
+
+
+def _replace_file(temp_path, target):
+    """Reemplaza el archivo real por el borrador.
+
+    En Windows el reemplazo puede fallar unos instantes si otro programa
+    (OneDrive, antivirus) tiene el archivo abierto; por eso se reintenta.
+    """
+    for attempt in range(1, SAVE_REPLACE_ATTEMPTS + 1):
+        try:
+            _os.replace(temp_path, target)
+            return
+        except PermissionError:
+            if attempt == SAVE_REPLACE_ATTEMPTS:
+                raise
+            time.sleep(SAVE_REPLACE_RETRY_SECONDS)
+
+
+def _remove_temp_files(targets):
+    for target in targets:
+        try:
+            _temp_path_for(target).unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def build_results_payload(results, review_items=None):
+    return {
+        'generated_at': datetime.now().isoformat(timespec='seconds'),
+        'results': results,
+        'review_items': review_items or [],
+    }
+
+
+def save_run_outputs(hashes, metadata, results, review_items=None):
+    """Guarda los tres archivos de una corrida completada de forma coherente."""
+    files_in_order = [
+        (RESULTS_FILE, build_results_payload(results, review_items)),
+        (METADATA_FILE, metadata),
+        (HASHES_FILE, hashes),
+    ]
+    targets = [target for target, _ in files_in_order]
+
+    # Paso 1: borradores. Ante cualquier error, los archivos reales quedan intactos.
+    try:
+        prepared = [
+            (_write_temp_json(target, data), target)
+            for target, data in files_in_order
+        ]
+    except Exception:
+        _remove_temp_files(targets)
+        raise
+
+    # Paso 2: reemplazos en el orden que prioriza no perder novedades.
+    try:
+        for temp_path, target in prepared:
+            _replace_file(temp_path, target)
+    finally:
+        _remove_temp_files(targets)
 
 
 def parse_iso_datetime(value):
@@ -285,17 +364,6 @@ def build_review_items(metadata, urls, now, stale_days=STALE_REVIEW_DAYS):
         reverse=True,
     )
 
-
-def save_results(results, review_items=None):
-    payload = {
-        'generated_at': datetime.now().isoformat(timespec='seconds'),
-        'results': results,
-        'review_items': review_items or [],
-    }
-    RESULTS_FILE.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False),
-        encoding='utf-8',
-    )
 
 def get_requests_session():
     session = requests.Session()
@@ -814,9 +882,7 @@ def run_monitor(
     review_items = build_review_items(metadata, urls, run_started_at)
     if should_cancel():
         raise RunCancelled()
-    save_hashes(new_hashes)
-    save_metadata(metadata)
-    save_results(processed_data, review_items)
+    save_run_outputs(new_hashes, metadata, processed_data, review_items)
     return processed_data
 
 

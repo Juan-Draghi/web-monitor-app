@@ -115,20 +115,20 @@ class PersistenceTests(unittest.TestCase):
             patch.object(monitor, 'load_hashes', return_value={'anterior': 'hash'}),
             patch.object(monitor, 'load_metadata', return_value={'anterior': {}}),
             patch.object(monitor, 'process_urls', new=cancelled_process),
-            patch.object(monitor, 'save_hashes') as save_hashes,
-            patch.object(monitor, 'save_metadata') as save_metadata,
-            patch.object(monitor, 'save_results') as save_results,
+            patch.object(monitor, 'save_run_outputs') as save_run_outputs,
         ):
             with self.assertRaises(monitor.RunCancelled):
                 monitor.run_monitor()
 
-        save_hashes.assert_not_called()
-        save_metadata.assert_not_called()
-        save_results.assert_not_called()
+        save_run_outputs.assert_not_called()
 
 class RunApiTests(unittest.TestCase):
     def setUp(self):
         self.client = app_module.app.test_client()
+        # Estas pruebas no dependen de la hora de la última corrida real.
+        no_previous_run = patch.object(app_module, 'get_last_completed_at', return_value=None)
+        no_previous_run.start()
+        self.addCleanup(no_previous_run.stop)
         app_module._cancel_event.clear()
         with app_module._state_lock:
             app_module._state.update({

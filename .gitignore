@@ -28,3 +28,6 @@ desktop.ini
 
 # Claude Code
 .claude/
+
+# Borradores del guardado (se borran solos; pueden quedar si se corta la luz)
+*.tmp

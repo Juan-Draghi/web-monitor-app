@@ -6,6 +6,43 @@ origino, la solucion aplicada y las verificaciones realizadas.
 Para decisiones tecnicas con alternativas o consecuencias relevantes, crear
 ademas un ADR en `docs/adr/`.
 
+## 2026-11-15 - Aviso de repeticion y guardado coherente de corridas
+
+**Problema**
+
+Una repeticion accidental de la corrida pocos minutos despues de la anterior
+podia devolver cero novedades y reemplazar los resultados que se necesitaban
+para el newsletter. Ademas, si el guardado final fallaba entre la escritura de
+referencias, metadatos y resultados, las novedades detectadas podian perderse.
+
+**Cambio aplicado**
+
+- `POST /run` pide confirmacion si la ultima corrida completada termino hace
+  menos de 60 minutos; la interfaz muestra el aviso con "No ejecutar" y
+  "Ejecutar igual".
+- El guardado de una corrida completada escribe primero borradores `.tmp` y
+  luego reemplaza los archivos reales en el orden resultados, metadatos,
+  referencias.
+- Reintento breve si Windows bloquea un archivo al reemplazarlo.
+- `.gitignore` excluye `*.tmp`.
+
+**Motivo**
+
+Conservar los resultados de la ultima corrida completada hasta que una nueva
+termine y se guarde, y priorizar una novedad repetida antes que una perdida.
+
+**Verificacion**
+
+- `venv\Scripts\python -m unittest discover tests`: 27 pruebas OK (19 nuevas y
+  2 existentes ajustadas para esta mejora).
+- Prueba en navegador sobre una copia con datos de prueba: aviso, rechazo,
+  confirmacion, conservacion de resultados durante la corrida y vista movil.
+- Recompilacion del ejecutable y comprobacion de que sirve la interfaz nueva.
+
+**ADR relacionado**
+
+- `docs/adr/0007-guardado-coherente-y-aviso-de-repeticion.md`
+
 ## 2026-08-31 - Controlar corridas prolongadas y permitir cancelarlas
 
 **Problema**

@@ -47,6 +47,19 @@
             </button>
           </div>
         </div>
+        <div class="repeat-warning" id="repeat-warning" role="alertdialog"
+             aria-labelledby="repeat-warning-title" aria-describedby="repeat-warning-text" hidden>
+          <p class="repeat-warning__title" id="repeat-warning-title">La última corrida terminó hace poco</p>
+          <p class="repeat-warning__text" id="repeat-warning-text"></p>
+          <div class="repeat-warning__actions">
+            <button class="button button--secondary" id="btn-repeat-dismiss" type="button" onclick="dismissRepeatWarning()">
+              No ejecutar
+            </button>
+            <button class="button" id="btn-repeat-confirm" type="button" onclick="confirmRepeatRun()">
+              Ejecutar igual
+            </button>
+          </div>
+        </div>
         <span class="pw-badge pw-none" id="pw-badge" role="status" aria-live="polite"></span>
         <div class="progress-wrap" id="progress-wrap">
           <div class="progress-track" role="progressbar" aria-label="Progreso del monitoreo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
@@ -210,15 +223,24 @@
         });
     }
 
-    function startRun() {
+    function startRun(confirmRepeat = false) {
+      hideRepeatWarning();
       setRunningControls(false);
       showRunMessage('Iniciando monitoreo…', 'info');
       document.getElementById('progress-wrap').style.display = 'block';
       setProgress(0, 'Iniciando…');
 
-      fetch('/run', { method: 'POST' })
+      fetch('/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm_repeat: confirmRepeat === true })
+      })
         .then(async response => {
           const data = await response.json();
+          if (data.confirmation_required) {
+            showRepeatWarning(data);
+            return;
+          }
           if (!response.ok || data.error) {
             throw new Error(data.error || 'No se pudo iniciar el monitoreo.');
           }
@@ -231,6 +253,47 @@
           syncRunState();
         });
     }
+
+    // ── Aviso de repetición ──────────────────────────────────────────────
+    // El servidor decide si corresponde avisar; la página solo muestra el
+    // aviso y envía la confirmación. "No ejecutar" no llama al servidor.
+
+    function showRepeatWarning(data) {
+      resetRunControls();
+      showRunMessage('', '');
+      const minutes = Number(data.minutes_since) || 0;
+      const elapsed = minutes === 0 ? 'menos de 1 minuto'
+        : minutes === 1 ? '1 minuto'
+        : minutes + ' minutos';
+      document.getElementById('repeat-warning-text').textContent =
+        'La última corrida completada terminó el ' + formatDateTime(data.last_completed_at) +
+        ' (hace ' + elapsed + '). Si ejecutás otra ahora, sus resultados reemplazarán ' +
+        'a los actuales cuando termine. Mientras tanto, los resultados actuales siguen disponibles.';
+      document.getElementById('repeat-warning').hidden = false;
+      document.getElementById('btn-run').disabled = true;
+      document.getElementById('btn-repeat-dismiss').focus();
+    }
+
+    function hideRepeatWarning() {
+      document.getElementById('repeat-warning').hidden = true;
+    }
+
+    function confirmRepeatRun() {
+      startRun(true);
+    }
+
+    function dismissRepeatWarning() {
+      hideRepeatWarning();
+      resetRunControls();
+      showRunMessage('No se inició una nueva corrida. Se conservan los resultados actuales.', 'info');
+      document.getElementById('btn-run').focus();
+    }
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !document.getElementById('repeat-warning').hidden) {
+        dismissRepeatWarning();
+      }
+    });
 
     function cancelRun() {
       const button = document.getElementById('btn-cancel');
