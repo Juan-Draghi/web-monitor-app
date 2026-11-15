@@ -1,0 +1,48 @@
+# Historial de fuentes
+
+Registro de altas, bajas y modificaciones de las fuentes monitoreadas (`urls.txt`).
+Lo escribe la aplicación Monitor web: no editar a mano. Cada cambio incluye su motivo.
+Este archivo se publica en GitHub junto con el proyecto.
+
+## 2026-11-15 18:05 · Inventario inicial
+- Motivo: Inicio del historial con las fuentes vigentes en urls.txt.
+- Fuentes (39):
+  - https://buenosaires.gob.ar/jefaturadegabinete/desarrollo-urbano/novedades-de-la-subsecretaria-de-gestion-urbana
+  - https://buenosaires.gob.ar/agc/noticias
+  - https://www.cpau.org/noticias
+  - https://buenosaires.gob.ar/noticias/desarrollo-urbano
+  - https://adrianmercadorealestate.com/blog/informes
+  - https://www.estadisticaciudad.gob.ar/eyc/?page_id=1479
+  - https://ceso.com.ar/producciones-publicaciones/
+  - https://colegioinmobiliario.org.ar/novedades
+  - https://colegioinmobiliario.org.ar/institucional/observatorio-estadistico
+  - https://www.afcp.org.ar/despacho-mensual
+  - https://www.indec.gob.ar/indec/web/Nivel3-Tema-3-3
+  - https://www.remax.com.ar/indice-remax
+  - https://www.uade.edu.ar/sites/investigacion/instituto-de-economia-ineco/informes-y-novedades/mei-informe-del-mercado-inmobiliario-e-indice-del-salario-real/
+  - https://www.nmrk.com.ar/informe/11170/reportes-de-mercado-2026
+  - https://www.fabianachaval.com/blog
+  - https://sites.google.com/view/red-operaciones-inmobiliarias
+  - https://www.ljramos.com.ar/informes-del-mercado-inmobiliario
+  - https://www.cbre.com.ar/insights#market-reports
+  - https://www.reporteinmobiliario.com/
+  - https://areasglobales.com.ar/
+  - https://www.lanacion.com.ar/buenos-aires/
+  - https://www.infobae.com/economia/real-estate/
+  - https://drive.google.com/drive/folders/152nNLH1zHRDy8egV5_QSMtoMNQmY50M8?usp=sharing
+  - https://www.zonaprop.com.ar/blog/zpindex/
+  - https://www.zonaprop.com.ar/blog/zpindex/gba-venta/
+  - https://www.zonaprop.com.ar/blog/zpindex/gba-oeste-venta/
+  - https://www.zonaprop.com.ar/blog/zpindex/gba-sur-venta/
+  - https://www.zonaprop.com.ar/blog/zpindex/informe-demanda/
+  - https://www.colegio-escribanos.org.ar/category/estadisticas-de-escrituras/
+  - https://www.colegio-escribanos.org.ar/noticias-2/
+  - https://fabianachaval.com/radar/
+  - https://www.ieric.org.ar/estadistica/informes-de-coyuntura/
+  - https://www.nmrk.com.ar/informe/11154/reportes-especiales-2026
+  - https://buenosaires.gob.ar/jefatura-de-gabinete/gestion-y-desarrollo-urbano
+  - https://ofava.org.ar/informes/
+  - https://www.econo.unlp.edu.ar/laboratorio/lab-real-9931
+  - https://www.ieric.org.ar/novedades/
+  - https://buenosaires.gob.ar/jefatura-de-gabinete/gestion-y-desarrollo-urbano/codigo-urbanistico-y-de-edificacion
+  - https://www.cedesu.com/documentos-de-trabajo

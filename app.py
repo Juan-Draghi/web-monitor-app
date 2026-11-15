@@ -15,8 +15,8 @@ from monitor import (
     RunCancelled,
     load_urls,
     run_monitor,
-    save_urls as write_urls,
 )
+import fuentes
 
 # ── Path handling: dev vs ejecutable PyInstaller ────────────────────────────
 # sys._MEIPASS  → donde PyInstaller extrajo los assets (templates, static)
@@ -203,15 +203,83 @@ def get_urls():
     return jsonify({'urls': urls, 'file': str(URLS_FILE)})
 
 
-@app.route('/urls', methods=['POST'])
-def save_urls():
+# ── Cambios de fuentes: de a uno, con motivo obligatorio ────────────────────
+# No existe un guardado de la lista completa: cada alta, baja o modificación
+# queda registrada en historial_fuentes.md (ver fuentes.py).
+
+def _apply_source_change(operation, block_during_run=True):
+    # Se mantiene el bloqueo durante el cambio para que no pueda arrancar una
+    # corrida a mitad de camino.
     with _state_lock:
-        if _state['running']:
-            return jsonify({'error': 'No se puede editar mientras hay una corrida en curso'}), 409
-    data = request.get_json()
-    urls = [u.strip() for u in data.get('urls', []) if u.strip()]
-    saved = write_urls(urls)
-    return jsonify({'saved': saved, 'file': str(URLS_FILE)})
+        if block_during_run and _state['running']:
+            return jsonify({'error': 'No se pueden modificar fuentes mientras hay una corrida en curso.'}), 409
+        try:
+            urls = operation()
+        except fuentes.HistoryFormatError as exc:
+            return jsonify({'error': f'No se pudo interpretar historial_fuentes.md: {exc}'}), 500
+        except fuentes.SourceError as exc:
+            return jsonify({'error': str(exc)}), 400
+        except fuentes.SourceSaveError as exc:
+            logging.exception('No se pudo guardar un cambio de fuentes')
+            return jsonify({'error': str(exc)}), 500
+        except OSError as exc:
+            logging.exception('Error de archivos al cambiar fuentes')
+            return jsonify({'error': f'No se pudo completar el cambio: {exc}'}), 500
+    return jsonify({'urls': urls, 'file': str(URLS_FILE)})
+
+
+# ── Cambios hechos fuera de la aplicación (a mano o desde GitHub) ──────────
+# Se detectan comparando urls.txt con el historial. No se bloquea el
+# monitoreo: la corrida usa urls.txt tal como está. Registrar sólo agrega
+# los motivos al historial; no modifica urls.txt.
+
+@app.route('/urls/external-changes', methods=['GET'])
+def get_external_changes():
+    with _state_lock:
+        try:
+            changes = fuentes.detect_external_changes()
+        except fuentes.HistoryFormatError as exc:
+            return jsonify({'error': f'No se pudo interpretar historial_fuentes.md: {exc}'}), 500
+        except (fuentes.SourceSaveError, OSError) as exc:
+            logging.exception('No se pudieron comparar las fuentes con el historial')
+            return jsonify({'error': str(exc)}), 500
+    changes['pending'] = bool(changes['added'] or changes['removed'])
+    return jsonify(changes)
+
+
+@app.route('/urls/external-changes', methods=['POST'])
+def register_external_changes():
+    body = request.get_json(silent=True) or {}
+    return _apply_source_change(
+        lambda: fuentes.register_external_changes(body.get('changes')),
+        block_during_run=False,
+    )
+
+
+@app.route('/urls/add', methods=['POST'])
+def add_url():
+    body = request.get_json(silent=True) or {}
+    return _apply_source_change(
+        lambda: fuentes.add_source(body.get('url'), body.get('motivo'))
+    )
+
+
+@app.route('/urls/remove', methods=['POST'])
+def remove_url():
+    body = request.get_json(silent=True) or {}
+    return _apply_source_change(
+        lambda: fuentes.remove_source(
+            body.get('url'), body.get('motivo'), body.get('seguimiento_manual') is True
+        )
+    )
+
+
+@app.route('/urls/update', methods=['POST'])
+def update_url():
+    body = request.get_json(silent=True) or {}
+    return _apply_source_change(
+        lambda: fuentes.update_source(body.get('url_anterior'), body.get('url'), body.get('motivo'))
+    )
 
 
 def _open_browser():
@@ -220,6 +288,11 @@ def _open_browser():
 
 
 if __name__ == '__main__':
+    try:
+        # Primera vez: crear el historial con el inventario de fuentes vigente.
+        fuentes.ensure_history()
+    except Exception:
+        logging.exception('No se pudo crear el historial de fuentes')
     try:
         threading.Thread(target=_open_browser, daemon=True).start()
         app.run(port=5000, debug=False, use_reloader=False)

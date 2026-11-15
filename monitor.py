@@ -130,12 +130,6 @@ def load_urls():
     ]
 
 
-def save_urls(urls):
-    clean_urls = [url.strip() for url in urls if url.strip()]
-    URLS_FILE.write_text('\n'.join(clean_urls) + '\n', encoding='utf-8')
-    return len(clean_urls)
-
-
 def clean_text(text):
     return ' '.join(text.split())
 
@@ -224,14 +218,19 @@ def _temp_path_for(target):
     return target.with_name(target.name + '.tmp')
 
 
-def _write_temp_json(target, data):
-    """Escribe el borrador de un archivo JSON y lo fuerza al disco."""
+def _write_temp_text(target, text):
+    """Escribe el borrador de un archivo de texto y lo fuerza al disco."""
     temp_path = _temp_path_for(target)
     with open(temp_path, 'w', encoding='utf-8') as handle:
-        handle.write(json.dumps(data, indent=2, ensure_ascii=False))
+        handle.write(text)
         handle.flush()
         _os.fsync(handle.fileno())
     return temp_path
+
+
+def _write_temp_json(target, data):
+    """Escribe el borrador de un archivo JSON y lo fuerza al disco."""
+    return _write_temp_text(target, json.dumps(data, indent=2, ensure_ascii=False))
 
 
 def _replace_file(temp_path, target):

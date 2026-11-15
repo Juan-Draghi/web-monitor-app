@@ -71,6 +71,23 @@
       </div>
     </section>
 
+    <section class="external-changes" id="external-changes" aria-labelledby="external-title" hidden>
+      <p class="external-changes__title" id="external-title">Cambios en urls.txt hechos fuera de la aplicación</p>
+      <p class="external-changes__text">
+        Se detectaron fuentes agregadas o quitadas directamente en el archivo. El monitoreo ya las usa así.
+        Indicá el motivo de cada cambio para registrarlo en <code>historial_fuentes.md</code>
+        (se publica en GitHub).
+      </p>
+      <span class="form-msg form-msg--error" id="external-error" role="alert" hidden></span>
+      <form id="external-form" onsubmit="submitExternalChanges(event)" novalidate>
+        <ol class="external-list" id="external-list"></ol>
+        <div class="source-form__actions">
+          <span class="form-msg" id="external-msg" role="status" aria-live="polite" hidden></span>
+          <button class="button" id="btn-external-submit" type="submit">Registrar en el historial</button>
+        </div>
+      </form>
+    </section>
+
     <section class="metric-band" aria-label="Resumen de la última corrida">
       <div class="metric">
         <span class="metric__value" id="count-total">0</span>
@@ -169,7 +186,7 @@
           <span class="state-icon state-icon--info" aria-hidden="true">URL</span>
           <span class="manager-summary">
             <span class="manager-title">Gestionar lista de URLs</span>
-            <span class="manager-description">Agregar, corregir o retirar fuentes del monitoreo.</span>
+            <span class="manager-description">Agregar, modificar o dar de baja fuentes, con su motivo.</span>
           </span>
           <span class="count-badge" id="url-count">Ver lista</span>
           <span class="manager-toggle__icon" aria-hidden="true">+</span>
@@ -177,21 +194,30 @@
 
         <div class="manager-body" id="url-manager-body">
           <span class="url-file-path" id="url-file-path"></span>
+          <p class="history-note">
+            Cada alta, baja o modificación exige un motivo y queda registrada en
+            <code>historial_fuentes.md</code>, que se publica en GitHub junto con el proyecto.
+            Describí hechos verificables, sin valoraciones internas.
+          </p>
+
+          <span class="form-msg" id="url-msg" role="status" aria-live="polite" hidden></span>
           <ul class="url-list" id="url-list"></ul>
 
-          <div class="add-row">
+          <form class="source-form" id="add-form" onsubmit="submitAdd(event)" novalidate>
+            <p class="source-form__title">Agregar fuente</p>
             <label class="url-field" for="new-url-input">
-              <span class="field-label">Nueva fuente</span>
-              <input class="new-url-input" type="url" id="new-url-input" placeholder="https://…" onkeydown="if(event.key==='Enter') addUrl()">
+              <span class="field-label">URL</span>
+              <input class="new-url-input" type="url" id="new-url-input" placeholder="https://…" autocomplete="off">
             </label>
-            <button class="button button--secondary" type="button" onclick="addUrl()">Agregar URL</button>
-          </div>
-
-          <div class="url-save-row">
-            <button class="button" id="btn-save-urls" type="button" onclick="saveUrls()">Guardar cambios</button>
-            <span class="save-msg" id="save-msg" role="status" aria-live="polite">Cambios guardados.</span>
-          </div>
-          <p class="manager-note">Los cambios se aplican al archivo activo indicado arriba.</p>
+            <label class="url-field" for="new-url-reason">
+              <span class="field-label">Motivo del alta</span>
+              <textarea class="reason-input" id="new-url-reason" rows="2"></textarea>
+            </label>
+            <div class="source-form__actions">
+              <span class="form-msg" id="add-msg" role="status" aria-live="polite" hidden></span>
+              <button class="button" id="btn-add-url" type="submit">Agregar fuente</button>
+            </div>
+          </form>
         </div>
       </div>
     </section>
@@ -199,7 +225,8 @@
 
   <script>
     let pollTimer = null;
-    let urlsDirty = false;
+    let currentUrls = [];
+    let openSourceForm = null; // { index, mode: 'edit' | 'remove' }
     let lastKnownRunState = 'idle';
 
     window.addEventListener('load', initializePage);
@@ -207,6 +234,7 @@
     function initializePage() {
       loadResults();
       syncRunState();
+      checkExternalChanges();
     }
 
     function syncRunState() {
@@ -552,78 +580,270 @@
       if (open) loadUrlList();
     }
 
+    // ── Fuentes: alta, modificación y baja de a una, con motivo ─────────────
+    // Cada operación llama a su propio endpoint; el servidor valida, guarda
+    // urls.txt y registra el cambio en historial_fuentes.md.
+
     function loadUrlList() {
       fetch('/urls')
         .then(response => response.json())
         .then(data => {
           document.getElementById('url-file-path').textContent = data.file ? 'Archivo activo: ' + data.file : '';
-          document.getElementById('url-count').textContent = (data.urls || []).length + ' fuentes';
-          renderUrlList(data.urls || []);
-          urlsDirty = false;
+          setUrls(data.urls || []);
         });
     }
 
-    function renderUrlList(urls) {
+    function setUrls(urls) {
+      currentUrls = urls;
+      openSourceForm = null;
+      document.getElementById('url-count').textContent = urls.length + ' fuentes';
+      renderUrlList();
+    }
+
+    function renderUrlList() {
       const list = document.getElementById('url-list');
-      list.innerHTML = urls.map((url, index) => `
-        <li class="url-row">
-          <label class="url-field">
-            <span class="field-label">URL ${index + 1}</span>
-            <input class="url-input" type="url" value="${escAttr(url)}"
-                   aria-label="URL ${index + 1}" oninput="markDirty()" data-index="${index}">
-          </label>
-          <button class="button button--danger" type="button" onclick="removeUrl(${index})" aria-label="Eliminar URL ${index + 1}">×</button>
-        </li>`).join('');
+      list.innerHTML = currentUrls.map((url, index) => {
+        const isOpen = openSourceForm && openSourceForm.index === index;
+        return `
+        <li class="url-row${isOpen ? ' url-row--open' : ''}">
+          <span class="url-text">${escHtml(url)}</span>
+          <span class="url-row__actions">
+            <button class="button button--secondary button--small" type="button"
+                    onclick="openSourceAction(${index}, 'edit')" ${isOpen ? 'disabled' : ''}
+                    aria-label="Modificar ${escAttr(url)}">Modificar</button>
+            <button class="button button--secondary button--small button--danger-text" type="button"
+                    onclick="openSourceAction(${index}, 'remove')" ${isOpen ? 'disabled' : ''}
+                    aria-label="Dar de baja ${escAttr(url)}">Dar de baja</button>
+          </span>
+          ${isOpen ? renderSourceForm(url, openSourceForm.mode) : ''}
+        </li>`;
+      }).join('');
     }
 
-    function markDirty() {
-      urlsDirty = true;
-    }
-
-    function addUrl() {
-      const input = document.getElementById('new-url-input');
-      const value = input.value.trim();
-      if (!value) {
-        input.focus();
-        return;
+    function renderSourceForm(url, mode) {
+      if (mode === 'edit') {
+        return `
+          <form class="source-form source-form--inline" onsubmit="submitEdit(event)" novalidate>
+            <p class="source-form__title">Modificar fuente</p>
+            <label class="url-field" for="edit-url-input">
+              <span class="field-label">URL nueva</span>
+              <input class="new-url-input" type="url" id="edit-url-input" value="${escAttr(url)}" autocomplete="off">
+            </label>
+            <label class="url-field" for="edit-url-reason">
+              <span class="field-label">Motivo de la modificación</span>
+              <textarea class="reason-input" id="edit-url-reason" rows="2"></textarea>
+            </label>
+            <div class="source-form__actions">
+              <span class="form-msg" id="source-form-msg" role="status" aria-live="polite" hidden></span>
+              <button class="button button--secondary" type="button" onclick="closeSourceAction()">Cancelar</button>
+              <button class="button" type="submit" id="btn-source-submit">Guardar modificación</button>
+            </div>
+          </form>`;
       }
-      const urls = [...document.querySelectorAll('#url-list .url-input')].map(item => item.value.trim());
-      urls.push(value);
-      renderUrlList(urls);
-      input.value = '';
-      urlsDirty = true;
+      return `
+          <form class="source-form source-form--inline" onsubmit="submitRemove(event)" novalidate>
+            <p class="source-form__title">Dar de baja esta fuente</p>
+            <p class="source-form__help">Deja de monitorearse automáticamente. La baja queda en el historial.</p>
+            <label class="url-field" for="remove-url-reason">
+              <span class="field-label">Motivo de la baja</span>
+              <textarea class="reason-input" id="remove-url-reason" rows="2"></textarea>
+            </label>
+            <label class="check-field" for="remove-manual-followup">
+              <input type="checkbox" id="remove-manual-followup">
+              <span>Continúa el seguimiento manual fuera de la aplicación</span>
+            </label>
+            <div class="source-form__actions">
+              <span class="form-msg" id="source-form-msg" role="status" aria-live="polite" hidden></span>
+              <button class="button button--secondary" type="button" onclick="closeSourceAction()">Cancelar</button>
+              <button class="button button--cancel" type="submit" id="btn-source-submit">Confirmar baja</button>
+            </div>
+          </form>`;
     }
 
-    function removeUrl(index) {
-      const urls = [...document.querySelectorAll('#url-list .url-input')].map(item => item.value.trim());
-      urls.splice(index, 1);
-      renderUrlList(urls);
-      urlsDirty = true;
+    function openSourceAction(index, mode) {
+      openSourceForm = { index, mode };
+      showFormMessage('url-msg', '', '');
+      renderUrlList();
+      const field = document.getElementById(mode === 'edit' ? 'edit-url-input' : 'remove-url-reason');
+      if (field) field.focus();
     }
 
-    function saveUrls() {
-      const urls = [...document.querySelectorAll('#url-list .url-input')]
-        .map(item => item.value.trim())
-        .filter(Boolean);
-      const button = document.getElementById('btn-save-urls');
-      button.disabled = true;
+    function closeSourceAction() {
+      const index = openSourceForm ? openSourceForm.index : null;
+      openSourceForm = null;
+      renderUrlList();
+      if (index !== null) {
+        const row = document.querySelectorAll('#url-list .url-row')[index];
+        const button = row && row.querySelector('button');
+        if (button) button.focus();
+      }
+    }
 
-      fetch('/urls', {
+    function showFormMessage(id, message, kind) {
+      const element = document.getElementById(id);
+      if (!element) return;
+      element.textContent = message || '';
+      element.hidden = !message;
+      element.className = 'form-msg' + (kind ? ' form-msg--' + kind : '');
+    }
+
+    function sendSourceChange(path, body, messageId, submitButton, successText) {
+      submitButton.disabled = true;
+      showFormMessage(messageId, 'Guardando…', 'info');
+      return fetch(path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urls })
+        body: JSON.stringify(body)
       })
         .then(async response => {
           const data = await response.json();
-          if (!response.ok || data.error) throw new Error(data.error || 'No se pudieron guardar las URLs.');
-          urlsDirty = false;
-          document.getElementById('url-count').textContent = urls.length + ' fuentes';
-          const message = document.getElementById('save-msg');
-          message.classList.add('visible');
-          setTimeout(() => message.classList.remove('visible'), 2500);
-          renderUrlList(urls);
+          if (!response.ok || data.error) throw new Error(data.error || 'No se pudo guardar el cambio.');
+          setUrls(data.urls || []);
+          showFormMessage('url-msg', successText, 'success');
+          return true;
         })
-        .catch(error => alert(error.message))
+        .catch(error => {
+          showFormMessage(messageId, error.message, 'error');
+          submitButton.disabled = false;
+          return false;
+        });
+    }
+
+    function requireReason(textareaId, messageId) {
+      const reason = document.getElementById(textareaId).value.trim();
+      if (!reason) {
+        showFormMessage(messageId, 'Indicá el motivo del cambio. Sin motivo no se guarda nada.', 'error');
+        document.getElementById(textareaId).focus();
+      }
+      return reason;
+    }
+
+    function submitAdd(event) {
+      event.preventDefault();
+      const urlInput = document.getElementById('new-url-input');
+      const url = urlInput.value.trim();
+      if (!url) {
+        showFormMessage('add-msg', 'Indicá la URL.', 'error');
+        urlInput.focus();
+        return;
+      }
+      const reason = requireReason('new-url-reason', 'add-msg');
+      if (!reason) return;
+      sendSourceChange('/urls/add', { url, motivo: reason }, 'add-msg',
+        document.getElementById('btn-add-url'),
+        'Fuente agregada y registrada en el historial.')
+        .then(ok => {
+          if (!ok) return;
+          urlInput.value = '';
+          document.getElementById('new-url-reason').value = '';
+          showFormMessage('add-msg', '', '');
+          document.getElementById('btn-add-url').disabled = false;
+        });
+    }
+
+    function submitEdit(event) {
+      event.preventDefault();
+      const previousUrl = currentUrls[openSourceForm.index];
+      const url = document.getElementById('edit-url-input').value.trim();
+      const reason = requireReason('edit-url-reason', 'source-form-msg');
+      if (!reason) return;
+      sendSourceChange('/urls/update', { url_anterior: previousUrl, url, motivo: reason },
+        'source-form-msg', document.getElementById('btn-source-submit'),
+        'Fuente modificada y registrada en el historial.');
+    }
+
+    function submitRemove(event) {
+      event.preventDefault();
+      const url = currentUrls[openSourceForm.index];
+      const reason = requireReason('remove-url-reason', 'source-form-msg');
+      if (!reason) return;
+      sendSourceChange('/urls/remove', {
+        url,
+        motivo: reason,
+        seguimiento_manual: document.getElementById('remove-manual-followup').checked
+      }, 'source-form-msg', document.getElementById('btn-source-submit'),
+        'Fuente dada de baja y registrada en el historial.');
+    }
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && openSourceForm) closeSourceAction();
+    });
+
+    // ── Cambios hechos fuera de la aplicación ───────────────────────────
+    // Al abrir la página se compara urls.txt con el historial. Si hay
+    // diferencias, se pide un motivo por cada una; registrar no cambia urls.txt.
+
+    let externalChanges = [];
+
+    function checkExternalChanges() {
+      fetch('/urls/external-changes')
+        .then(async response => {
+          const data = await response.json();
+          if (!response.ok || data.error) throw new Error(data.error || 'No se pudo comparar la lista con el historial.');
+          externalChanges = [
+            ...(data.added || []).map(url => ({ url, tipo: 'alta' })),
+            ...(data.removed || []).map(url => ({ url, tipo: 'baja' }))
+          ];
+          renderExternalChanges();
+        })
+        .catch(error => {
+          // No se pudo comparar (por ejemplo, historial editado a mano): avisar sin formulario.
+          externalChanges = [];
+          renderExternalChanges();
+          document.getElementById('external-changes').hidden = false;
+          document.getElementById('external-form').hidden = true;
+          const element = document.getElementById('external-error');
+          element.textContent = error.message;
+          element.hidden = false;
+        });
+    }
+
+    function renderExternalChanges() {
+      const section = document.getElementById('external-changes');
+      section.hidden = externalChanges.length === 0;
+      document.getElementById('external-list').innerHTML = externalChanges.map((change, index) => `
+        <li class="external-item">
+          <span class="external-item__head">
+            <span class="external-badge external-badge--${change.tipo}">${change.tipo === 'alta' ? 'Agregada' : 'Quitada'}</span>
+            <span class="url-text">${escHtml(change.url)}</span>
+          </span>
+          <label class="url-field" for="external-reason-${index}">
+            <span class="field-label">Motivo</span>
+            <textarea class="reason-input" id="external-reason-${index}" rows="2"></textarea>
+          </label>
+        </li>`).join('');
+    }
+
+    function submitExternalChanges(event) {
+      event.preventDefault();
+      const changes = externalChanges.map((change, index) => ({
+        ...change,
+        motivo: document.getElementById('external-reason-' + index).value.trim()
+      }));
+      const missing = changes.findIndex(change => !change.motivo);
+      if (missing !== -1) {
+        showFormMessage('external-msg', 'Indicá el motivo de cada cambio. Sin motivo no se registra nada.', 'error');
+        document.getElementById('external-reason-' + missing).focus();
+        return;
+      }
+      const button = document.getElementById('btn-external-submit');
+      button.disabled = true;
+      showFormMessage('external-msg', 'Registrando…', 'info');
+      fetch('/urls/external-changes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ changes })
+      })
+        .then(async response => {
+          const data = await response.json();
+          if (!response.ok || data.error) throw new Error(data.error || 'No se pudo registrar en el historial.');
+          externalChanges = [];
+          renderExternalChanges();
+          showFormMessage('external-msg', '', '');
+          showRunMessage('Los cambios hechos fuera de la aplicación quedaron registrados en el historial.', 'success');
+          if (document.getElementById('url-manager-body').classList.contains('open')) loadUrlList();
+        })
+        .catch(error => showFormMessage('external-msg', error.message, 'error'))
         .finally(() => { button.disabled = false; });
     }
   </script>

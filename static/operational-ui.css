@@ -808,30 +808,219 @@ h1 {
   box-shadow: var(--ui-focus);
 }
 
-.add-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 10px;
-  margin-top: 12px;
+/* Cambios en urls.txt hechos fuera de la aplicación. */
+.external-changes {
+  margin: 0 0 24px;
+  padding: 16px 18px;
+  background: var(--ui-warning-soft);
+  border: 1px solid var(--ui-warning);
+  border-radius: var(--ui-radius-card);
 }
 
-.url-save-row {
+.external-changes[hidden] {
+  display: none;
+}
+
+.external-changes__title {
+  margin: 0 0 4px;
+  color: var(--ui-warning);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.external-changes__text {
+  max-width: 72ch;
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.external-changes__text code {
+  font-size: 12px;
+}
+
+.external-list {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.external-item {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  border-radius: 10px;
+}
+
+.external-item__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.external-badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.external-badge--alta {
+  color: var(--ui-success);
+  background: var(--ui-success-soft);
+}
+
+.external-badge--baja {
+  color: var(--ui-danger);
+  background: var(--ui-danger-soft);
+}
+
+/* Fuentes: operaciones de a una con motivo (historial_fuentes.md). */
+.history-note {
+  max-width: 68ch;
+  margin: 0 0 14px;
+  color: var(--ui-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.history-note code {
+  font-size: 11px;
+}
+
+.url-text {
+  min-width: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.url-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.url-row--open {
+  background: var(--ui-surface-soft);
+}
+
+.button--small {
+  min-height: 32px;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.button--danger-text {
+  color: var(--ui-danger);
+}
+
+.source-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line);
+  border-radius: 10px;
+}
+
+.source-form--inline {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  border-color: var(--ui-line-strong);
+}
+
+.source-form__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.source-form__help {
+  margin: -4px 0 0;
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+
+.source-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.source-form__actions .form-msg {
+  margin-right: auto;
+}
+
+.reason-input {
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 11px;
+  color: var(--ui-ink);
+  font: inherit;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-line-strong);
+  border-radius: var(--ui-radius-control);
+  resize: vertical;
+}
+
+.reason-input:focus {
+  border-color: var(--ui-accent);
+  outline: 0;
+  box-shadow: var(--ui-focus);
+}
+
+.check-field {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-top: 16px;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
 }
 
-.save-msg {
-  color: var(--ui-success);
+.check-field input {
+  width: 16px;
+  height: 16px;
+}
+
+.form-msg {
+  display: block;
+  padding: 7px 10px;
+  border-radius: var(--ui-radius-control);
   font-size: 12px;
-  font-weight: 680;
-  opacity: 0;
+  font-weight: 650;
 }
 
-.save-msg.visible {
-  opacity: 1;
+#url-msg {
+  margin-bottom: 10px;
+}
+
+.form-msg[hidden] {
+  display: none;
+}
+
+.form-msg--info {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.form-msg--success {
+  color: var(--ui-success);
+  background: var(--ui-success-soft);
+}
+
+.form-msg--error {
+  color: var(--ui-danger);
+  background: var(--ui-danger-soft);
 }
 
 .manager-note {
@@ -926,13 +1115,21 @@ h1 {
     justify-self: start;
   }
 
-  .add-row {
+  .url-row {
     grid-template-columns: 1fr;
   }
 
-  .url-save-row {
+  .url-row__actions {
+    justify-content: flex-start;
+  }
+
+  .source-form__actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .source-form__actions .form-msg {
+    margin-right: 0;
   }
 }
 

@@ -6,6 +6,43 @@ origino, la solucion aplicada y las verificaciones realizadas.
 Para decisiones tecnicas con alternativas o consecuencias relevantes, crear
 ademas un ADR en `docs/adr/`.
 
+## 2026-11-15 - Historial de fuentes con motivo obligatorio
+
+**Problema**
+
+Las altas, bajas y modificaciones de fuentes no dejaban registro del cambio ni
+de su causa. La interfaz guardaba la lista completa y `urls.txt` tambien se
+editaba a mano o desde GitHub.
+
+**Cambio aplicado**
+
+- Se creo `fuentes.py` y el archivo `historial_fuentes.md`, con inventario
+  inicial de las fuentes vigentes.
+- Alta, baja y modificacion de a una, con motivo obligatorio; en las bajas se
+  registra si continua el seguimiento manual fuera de la aplicacion.
+- Se elimino el guardado de la lista completa (`POST /urls`).
+- Guardado coherente de `urls.txt` e historial, con restauracion ante fallos.
+- Deteccion de cambios hechos fuera de la aplicacion y registro de sus motivos.
+- Nuevo panel de fuentes y aviso de cambios externos en la interfaz.
+
+**Motivo**
+
+Poder reconstruir que fuentes se agregaron, modificaron o dieron de baja y por
+que, incluidas las decisiones derivadas de problemas de lectura.
+
+**Verificacion**
+
+- `venv\Scripts\python -m unittest discover tests`: 51 pruebas OK (24 nuevas).
+- Prueba en navegador sobre una copia con datos de prueba: alta, baja con
+  seguimiento manual, modificacion, rechazo sin motivo y por URL repetida,
+  aviso y registro de cambios externos, vista movil.
+- Recompilacion del ejecutable y comprobacion de que crea el inventario
+  inicial y sirve la interfaz nueva.
+
+**ADR relacionado**
+
+- `docs/adr/0008-historial-de-fuentes.md`
+
 ## 2026-11-15 - Aviso de repeticion y guardado coherente de corridas
 
 **Problema**

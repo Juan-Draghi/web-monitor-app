@@ -54,7 +54,9 @@ El diseño se adapta a pantallas de escritorio, tablet y móvil sin desplazamien
 | Archivo | Descripción |
 |---|---|
 | `urls.txt` | Lista de URLs monitoreadas (una por línea) |
+| `historial_fuentes.md` | Historial de altas, bajas y modificaciones de fuentes, con motivo |
 | `monitor.py` | Lógica de monitoreo, hashing y detección de cambios |
+| `fuentes.py` | Cambios de fuentes con motivo obligatorio e historial |
 | `app.py` | Servidor Flask y manejo de estado |
 | `templates/index.html` | Estructura y comportamiento de la interfaz web |
 | `static/operational-ui.css` | Sistema visual neutro y reglas responsive |
@@ -73,6 +75,26 @@ El diseño se adapta a pantallas de escritorio, tablet y móvil sin desplazamien
 La lista que usa el monitoreo es `urls.txt` en la carpeta raíz del proyecto.
 La interfaz web también escribe sobre ese mismo archivo y muestra la ruta activa
 en el panel **Gestionar lista de URLs**.
+
+## Historial de fuentes
+
+Las fuentes se agregan, modifican o dan de baja **de a una** desde el panel
+**Gestionar lista de URLs**, y cada operación exige un motivo. El cambio y su
+motivo quedan en `historial_fuentes.md`, en la carpeta raíz del proyecto:
+
+- se puede leer en cualquier editor o pedirle a un agente que lo consulte;
+- se publica en GitHub junto con el proyecto, por lo que los motivos deben
+  describir hechos verificables, sin valoraciones internas;
+- en las bajas se indica si continúa el seguimiento manual fuera de la
+  aplicación (no existe una lista interna de seguimiento);
+- lo escribe la aplicación: no editarlo a mano.
+
+La primera vez que se abre la aplicación, el historial se crea con un
+**inventario inicial** de las fuentes vigentes. Si después se edita `urls.txt`
+a mano o desde GitHub, al abrir la aplicación aparece el aviso **Cambios en
+urls.txt hechos fuera de la aplicación**, que pide el motivo de cada fuente
+agregada o quitada para registrarla. Ese aviso no bloquea el monitoreo. Ver
+`docs/adr/0008-historial-de-fuentes.md`.
 
 Si se recompila el ejecutable, no editar copias antiguas de `urls.txt` dentro
 de `dist/MonitoreoWeb`; la referencia válida es la ruta indicada por la
