@@ -685,6 +685,59 @@ h1 {
   justify-self: start;
 }
 
+/* Revisión de URLs sin cambios: acciones por URL y secciones clasificadas. */
+#panel-review .result-list,
+#panel-to-review .result-list,
+#panel-inactive .result-list {
+  max-height: 440px;
+}
+
+.panel-help {
+  margin: 0;
+  padding: 10px 18px 0;
+  color: var(--ui-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.compact-panel > .form-msg {
+  margin: 10px 18px 0;
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.review-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--ui-surface-soft);
+  border: 1px solid var(--ui-line-strong);
+  border-radius: var(--ui-radius-control);
+}
+
+.review-form__title {
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.review-form .review-actions {
+  justify-content: flex-end;
+  margin-top: 0;
+}
+
+.review-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .manager-toggle {
   display: flex;
   width: 100%;

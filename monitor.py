@@ -336,25 +336,47 @@ def update_url_metadata(metadata, url, status, result, error_msg, now):
     metadata[url] = current
 
 
-def build_review_items(metadata, urls, now, stale_days=STALE_REVIEW_DAYS):
+def build_review_items(metadata, urls, now, stale_days=STALE_REVIEW_DAYS, reviews=None):
+    """URLs leídas correctamente y sin cambios desde hace `stale_days` o más.
+
+    `reviews` (de revisiones_urls.json) ajusta el cálculo:
+    - las URLs clasificadas como «a revisar» o «inactivo» no se incluyen;
+    - si la persona confirmó que no hubo novedades, el plazo cuenta desde la
+      fecha más reciente entre esa revisión y el último cambio detectado.
+    """
+    reviews = reviews or {}
     review_items = []
     for url in urls:
         item = metadata.get(url, {})
         if item.get('last_status') != 'Success':
             continue
+        review = reviews.get(url, {})
+        if review.get('estado') in ('a_revisar', 'inactivo'):
+            continue
 
         last_change_at = item.get('last_change_at') or item.get('first_seen_at')
-        elapsed_days = days_since(last_change_at, now)
+        last_reviewed_at = review.get('ultima_revision') or ''
+        counts_from_review = bool(
+            last_reviewed_at and (not last_change_at or last_reviewed_at > last_change_at)
+        )
+        reference_at = last_reviewed_at if counts_from_review else last_change_at
+        elapsed_days = days_since(reference_at, now)
         if elapsed_days is None or elapsed_days < stale_days:
             continue
 
+        if counts_from_review:
+            reason = (f'Sin cambios detectados desde la última revisión manual '
+                      f'(hace {elapsed_days} dias)')
+        else:
+            reason = f'Sin cambios detectados hace {elapsed_days} dias'
         review_items.append({
             'URL': url,
             'DiasDesdeUltimoCambio': elapsed_days,
             'UltimoCambio': last_change_at,
+            'UltimaRevision': last_reviewed_at,
             'UltimaLecturaExitosa': item.get('last_success_at', ''),
             'CorridasSinCambios': int(item.get('consecutive_unchanged_runs', 0)),
-            'Motivo': f'Sin cambios detectados hace {elapsed_days} dias',
+            'Motivo': reason,
         })
 
     return sorted(
@@ -878,7 +900,11 @@ def run_monitor(
         )
         processed_data.append(row)
 
-    review_items = build_review_items(metadata, urls, run_started_at)
+    # Las revisiones se leen al final para incluir las hechas durante la corrida.
+    import revisiones
+    review_items = build_review_items(
+        metadata, urls, run_started_at, reviews=revisiones.load_reviews()
+    )
     if should_cancel():
         raise RunCancelled()
     save_run_outputs(new_hashes, metadata, processed_data, review_items)

@@ -17,6 +17,7 @@ from monitor import (
     run_monitor,
 )
 import fuentes
+import revisiones
 
 # ── Path handling: dev vs ejecutable PyInstaller ────────────────────────────
 # sys._MEIPASS  → donde PyInstaller extrajo los assets (templates, static)
@@ -191,10 +192,54 @@ def status():
 
 @app.route('/results')
 def results():
-    if not RESULTS_FILE.exists():
-        return jsonify({'results': [], 'generated_at': ''})
-    data = json.loads(RESULTS_FILE.read_text(encoding='utf-8'))
+    if RESULTS_FILE.exists():
+        data = json.loads(RESULTS_FILE.read_text(encoding='utf-8'))
+    else:
+        data = {'results': [], 'generated_at': '', 'review_items': []}
+    # Las revisiones manuales se aplican en el momento, sin esperar otra corrida.
+    reviews = revisiones.load_reviews()
+    data['review_items'] = revisiones.filter_pending_review_items(
+        data.get('review_items') or [], data.get('generated_at') or '', reviews
+    )
+    urls = load_urls()
+    data['to_review_items'] = revisiones.classified_items(revisiones.STATE_TO_REVIEW, urls, reviews)
+    data['inactive_items'] = revisiones.classified_items(revisiones.STATE_INACTIVE, urls, reviews)
     return jsonify(data)
+
+
+# ── Revisión de URLs sin cambios ─────────────────────────────────────────────
+# Se guarda en revisiones_urls.json, que las corridas sólo leen: por eso se
+# permite revisar también mientras corre el monitoreo.
+
+def _apply_review(operation):
+    try:
+        record = operation()
+    except revisiones.ReviewError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except OSError as exc:
+        logging.exception('No se pudo guardar una revisión de URL')
+        return jsonify({'error': f'No se pudo guardar la revisión; no se aplicó. Detalle: {exc}'}), 500
+    return jsonify({'review': record})
+
+
+@app.route('/reviews/confirm', methods=['POST'])
+def review_confirm():
+    body = request.get_json(silent=True) or {}
+    return _apply_review(lambda: revisiones.confirm_no_news(body.get('url')))
+
+
+@app.route('/reviews/classify', methods=['POST'])
+def review_classify():
+    body = request.get_json(silent=True) or {}
+    return _apply_review(
+        lambda: revisiones.classify(body.get('url'), body.get('estado'), body.get('nota'))
+    )
+
+
+@app.route('/reviews/resolve', methods=['POST'])
+def review_resolve():
+    body = request.get_json(silent=True) or {}
+    return _apply_review(lambda: revisiones.resolve(body.get('url')))
 
 
 @app.route('/urls', methods=['GET'])

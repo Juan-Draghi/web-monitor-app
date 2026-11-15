@@ -142,7 +142,35 @@
               <span class="panel-title">Revisión por antigüedad</span>
               <span class="count-badge" aria-hidden="true" id="count-review-panel">0</span>
             </summary>
+            <p class="panel-help">Revisá cada sitio e indicá el resultado. Si todavía no sabés la causa, dejalo pendiente.</p>
+            <span class="form-msg" id="review-msg" role="status" aria-live="polite" hidden></span>
             <div class="result-list" id="list-review">
+              <div class="empty-msg">Cargando resultados…</div>
+            </div>
+          </details>
+
+          <details class="compact-panel" id="panel-to-review">
+            <summary class="compact-panel__header">
+              <span class="state-icon state-icon--warning" aria-hidden="true">?</span>
+              <span class="panel-title">URLs a revisar</span>
+              <span class="count-badge" aria-hidden="true" id="count-to-review-panel">0</span>
+            </summary>
+            <p class="panel-help">Cambios que la aplicación no detectó. Se siguen monitoreando hasta que las marques como resueltas.</p>
+            <span class="form-msg" id="to-review-msg" role="status" aria-live="polite" hidden></span>
+            <div class="result-list" id="list-to-review">
+              <div class="empty-msg">Cargando resultados…</div>
+            </div>
+          </details>
+
+          <details class="compact-panel" id="panel-inactive">
+            <summary class="compact-panel__header">
+              <span class="state-icon state-icon--danger" aria-hidden="true">–</span>
+              <span class="panel-title">Sitios inactivos o caídos</span>
+              <span class="count-badge" aria-hidden="true" id="count-inactive-panel">0</span>
+            </summary>
+            <p class="panel-help">Se siguen monitoreando. Marcalos como resueltos o dalos de baja desde «Fuentes monitoreadas».</p>
+            <span class="form-msg" id="inactive-msg" role="status" aria-live="polite" hidden></span>
+            <div class="result-list" id="list-inactive">
               <div class="empty-msg">Cargando resultados…</div>
             </div>
           </details>
@@ -458,6 +486,7 @@
             document.getElementById('updated-summary').textContent = 'Actualizado: ' + formatted;
           }
           renderResults(data.results || [], data.review_items || []);
+          renderClassified(data.to_review_items || [], data.inactive_items || []);
         })
         .catch(() => {
           document.getElementById('updated-summary').textContent = 'No se pudieron cargar los resultados';
@@ -511,20 +540,153 @@
       }).join('');
     }
 
+    // ── Revisión de URLs sin cambios ─────────────────────────────────────
+    // Cada URL pendiente ofrece tres resultados: sin novedades (R1), cambios
+    // no detectados (R2) o sitio inactivo/caído (R3). Las dos clasificaciones
+    // abren una nota opcional. Las URLs clasificadas se cierran con
+    // «Marcar como resuelta». Todo se guarda en revisiones_urls.json.
+
+    let reviewItems = [];
+    let classifiedItems = { a_revisar: [], inactivo: [] };
+    let openReviewForm = null; // { index, estado }
+
+    const REVIEW_LABELS = {
+      a_revisar: 'Cambios no detectados',
+      inactivo: 'Sitio inactivo o caído'
+    };
+
     function renderReviewList(id, items) {
+      reviewItems = items;
       const element = document.getElementById(id);
       if (!items.length) {
         element.innerHTML = '<div class="empty-msg">Sin URLs pendientes de revisión por antigüedad.</div>';
         return;
       }
 
-      element.innerHTML = items.map(item => {
-        const metadata = item.DiasDesdeUltimoCambio + ' días sin cambios · '
-          + item.CorridasSinCambios + ' corridas · última lectura: '
+      element.innerHTML = items.map((item, index) => {
+        const metadata = (item.Motivo || (item.DiasDesdeUltimoCambio + ' días sin cambios'))
+          + ' · ' + item.CorridasSinCambios + ' corridas · última lectura: '
           + formatDateTime(item.UltimaLecturaExitosa);
-        return resultItemHtml(String(item.URL || ''), '<span class="result-meta">' + escHtml(metadata) + '</span>');
+        const isOpen = openReviewForm && openReviewForm.index === index;
+        const actions = isOpen ? reviewFormHtml(openReviewForm.estado) : `
+          <div class="review-actions">
+            <button class="button button--secondary button--small" type="button"
+                    onclick="confirmNoNews(${index})">Sin novedades</button>
+            <button class="button button--secondary button--small" type="button"
+                    onclick="openReviewClassification(${index}, 'a_revisar')">Cambios no detectados</button>
+            <button class="button button--secondary button--small" type="button"
+                    onclick="openReviewClassification(${index}, 'inactivo')">Sitio inactivo o caído</button>
+          </div>`;
+        return resultItemHtml(String(item.URL || ''),
+          '<span class="result-meta">' + escHtml(metadata) + '</span>' + actions);
       }).join('');
     }
+
+    function reviewFormHtml(estado) {
+      return `
+        <form class="review-form" onsubmit="submitReviewClassification(event)" novalidate>
+          <span class="review-form__title">${escHtml(REVIEW_LABELS[estado])}</span>
+          <label class="url-field" for="review-note">
+            <span class="field-label">Nota (opcional)</span>
+            <textarea class="reason-input" id="review-note" rows="2"></textarea>
+          </label>
+          <div class="review-actions">
+            <button class="button button--secondary button--small" type="button" onclick="closeReviewForm()">Cancelar</button>
+            <button class="button button--small" type="submit" id="btn-review-submit">Guardar</button>
+          </div>
+        </form>`;
+    }
+
+    function openReviewClassification(index, estado) {
+      openReviewForm = { index, estado };
+      showFormMessage('review-msg', '', '');
+      renderReviewList('list-review', reviewItems);
+      document.getElementById('review-note').focus();
+    }
+
+    function closeReviewForm() {
+      openReviewForm = null;
+      renderReviewList('list-review', reviewItems);
+    }
+
+    function sendReview(path, body, messageId, successText) {
+      showFormMessage(messageId, 'Guardando…', 'info');
+      return fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+        .then(async response => {
+          const data = await response.json();
+          if (!response.ok || data.error) throw new Error(data.error || 'No se pudo guardar la revisión.');
+          openReviewForm = null;
+          loadResults();
+          showFormMessage(messageId, successText, 'success');
+        })
+        .catch(error => showFormMessage(messageId, error.message, 'error'));
+    }
+
+    function confirmNoNews(index) {
+      const url = reviewItems[index].URL;
+      sendReview('/reviews/confirm', { url }, 'review-msg',
+        'Revisada sin novedades: ' + stripProtocol(url) + '. El plazo de 30 días vuelve a contar desde hoy.');
+    }
+
+    function submitReviewClassification(event) {
+      event.preventDefault();
+      const { index, estado } = openReviewForm;
+      const url = reviewItems[index].URL;
+      document.getElementById('btn-review-submit').disabled = true;
+      const destination = estado === 'a_revisar' ? '«URLs a revisar»' : '«Sitios inactivos o caídos»';
+      sendReview('/reviews/classify', {
+        url, estado, nota: document.getElementById('review-note').value.trim()
+      }, 'review-msg', stripProtocol(url) + ' pasó a ' + destination + '.');
+    }
+
+    function renderClassified(toReview, inactive) {
+      classifiedItems = { a_revisar: toReview, inactivo: inactive };
+      setCount('count-to-review-panel', toReview.length);
+      setCount('count-inactive-panel', inactive.length);
+      renderClassifiedList('list-to-review', 'a_revisar', 'Ninguna URL en revisión.');
+      renderClassifiedList('list-inactive', 'inactivo', 'Ningún sitio marcado como inactivo o caído.');
+      if (toReview.length) document.getElementById('panel-to-review').open = true;
+      if (inactive.length) document.getElementById('panel-inactive').open = true;
+    }
+
+    function renderClassifiedList(id, estado, emptyMessage) {
+      const items = classifiedItems[estado];
+      const element = document.getElementById(id);
+      if (!items.length) {
+        element.innerHTML = '<div class="empty-msg">' + escHtml(emptyMessage) + '</div>';
+        return;
+      }
+      element.innerHTML = items.map((item, index) => {
+        const lines = ['Marcada el ' + formatDateTime(item.ClasificadaEl)];
+        if (estado === 'inactivo') {
+          lines.push('última lectura exitosa: ' + formatDateTime(item.UltimaLecturaExitosa)
+            + ' · último cambio: ' + formatDateTime(item.UltimoCambio));
+        }
+        const note = item.Nota
+          ? '<span class="review-note">Nota: ' + escHtml(item.Nota) + '</span>' : '';
+        const detail = '<span class="result-meta">' + escHtml(lines.join(' · ')) + '</span>' + note
+          + `<div class="review-actions">
+               <button class="button button--secondary button--small" type="button"
+                       onclick="resolveReview('${estado}', ${index})">Marcar como resuelta</button>
+             </div>`;
+        return resultItemHtml(String(item.URL || ''), detail);
+      }).join('');
+    }
+
+    function resolveReview(estado, index) {
+      const url = classifiedItems[estado][index].URL;
+      const messageId = estado === 'a_revisar' ? 'to-review-msg' : 'inactive-msg';
+      sendReview('/reviews/resolve', { url }, messageId,
+        stripProtocol(url) + ' volvió al monitoreo normal. El plazo de 30 días cuenta desde hoy.');
+    }
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && openReviewForm) closeReviewForm();
+    });
 
     function resultItemHtml(url, detailHtml, actionLabel = 'Abrir fuente ↗') {
       const safeUrl = safeExternalUrl(url);

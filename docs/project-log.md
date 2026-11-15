@@ -6,6 +6,43 @@ origino, la solucion aplicada y las verificaciones realizadas.
 Para decisiones tecnicas con alternativas o consecuencias relevantes, crear
 ademas un ADR en `docs/adr/`.
 
+## 2026-11-15 - Revision y clasificacion de URLs sin cambios
+
+**Problema**
+
+Las URLs sin cambios durante 30 dias permanecian en **Revision por
+antiguedad** en cada corrida y se acumulaban, sin distinguir las revisadas de
+las pendientes ni organizar su seguimiento.
+
+**Cambio aplicado**
+
+- Se creo `revisiones.py` y el archivo local `revisiones_urls.json`.
+- Tres resultados por URL: sin novedades (el plazo vuelve a contar desde la
+  revision), cambios no detectados y sitio inactivo o caido (nota opcional).
+- Secciones **URLs a revisar** y **Sitios inactivos o caidos**, con
+  **Marcar como resuelta**.
+- El calculo de 30 dias considera la ultima revision y excluye las URLs
+  clasificadas; las revisiones se aplican en pantalla sin esperar otra corrida.
+- `.gitignore` excluye `revisiones_urls.json`.
+
+**Motivo**
+
+Retirar de pendientes las URLs revisadas y organizar el seguimiento segun la
+causa indicada, sin perder revisiones hechas durante una corrida.
+
+**Verificacion**
+
+- `venv\Scripts\python -m unittest discover tests`: 64 pruebas OK (13 nuevas).
+- Prueba en navegador sobre una copia de los datos reales: las tres acciones,
+  resolucion, recarga y vista movil. No se pudieron tomar capturas de
+  escritorio (ventana oculta); la disposicion se verifico con mediciones.
+- Recompilacion del ejecutable y comprobacion de que sirve la interfaz nueva
+  sin modificar los datos.
+
+**ADR relacionado**
+
+- `docs/adr/0009-revision-de-urls-sin-cambios.md`
+
 ## 2026-11-15 - Historial de fuentes con motivo obligatorio
 
 **Problema**

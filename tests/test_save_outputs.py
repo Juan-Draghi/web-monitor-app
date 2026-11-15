@@ -13,6 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import monitor
+import revisiones
 
 URL_A = 'https://a.example'
 URL_B = 'https://b.example'
@@ -53,6 +54,7 @@ class SaveRunOutputsTests(unittest.TestCase):
             patch.object(monitor, 'METADATA_FILE', self.files['metadata']),
             patch.object(monitor, 'HASHES_FILE', self.files['hashes']),
             patch.object(monitor, 'load_urls', return_value=[URL_A, URL_B]),
+            patch.object(revisiones, 'REVIEWS_FILE', self.base / 'revisiones_urls.json'),
             patch.object(monitor.time, 'sleep'),
         ]
         for item in self._patches:

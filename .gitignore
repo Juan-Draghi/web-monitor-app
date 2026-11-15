@@ -31,3 +31,6 @@ desktop.ini
 
 # Borradores del guardado (se borran solos; pueden quedar si se corta la luz)
 *.tmp
+
+# Revisiones manuales de URLs sin cambios (datos locales de uso)
+revisiones_urls.json

@@ -57,6 +57,7 @@ El diseño se adapta a pantallas de escritorio, tablet y móvil sin desplazamien
 | `historial_fuentes.md` | Historial de altas, bajas y modificaciones de fuentes, con motivo |
 | `monitor.py` | Lógica de monitoreo, hashing y detección de cambios |
 | `fuentes.py` | Cambios de fuentes con motivo obligatorio e historial |
+| `revisiones.py` | Revisión manual de URLs sin cambios y su clasificación |
 | `app.py` | Servidor Flask y manejo de estado |
 | `templates/index.html` | Estructura y comportamiento de la interfaz web |
 | `static/operational-ui.css` | Sistema visual neutro y reglas responsive |
@@ -109,7 +110,28 @@ detectado y la cantidad de corridas consecutivas sin cambios.
 Si una URL fue leída correctamente pero no tuvo cambios detectados durante 30
 días o más, aparece en la sección **Revisión por antigüedad** de la interfaz.
 Esto permite detectar sitios que movieron su contenido aunque la URL original
-siga respondiendo sin novedades.
+siga respondiendo sin novedades. El cálculo se hace al terminar cada corrida.
+
+Cada URL de esa sección se revisa manualmente y se marca con uno de tres
+resultados:
+
+- **Sin novedades:** sale de la lista y el plazo de 30 días vuelve a contar
+  desde la revisión. Si antes se detecta un cambio, el plazo cuenta desde ese
+  cambio.
+- **Cambios no detectados:** pasa a **URLs a revisar**, con una nota opcional.
+- **Sitio inactivo o caído:** pasa a **Sitios inactivos o caídos**, con una
+  nota opcional y la fecha de la última lectura exitosa y del último cambio.
+
+En las dos últimas secciones la URL se sigue monitoreando y no vuelve a la
+revisión por antigüedad hasta que se marca como **resuelta**; desde ese día el
+plazo vuelve a contar. Si la revisión termina en una baja o una modificación de
+la fuente, se hace desde **Gestionar lista de URLs**, con su motivo. Si todavía
+no se conoce la causa, la URL se deja pendiente.
+
+Las revisiones se guardan en `revisiones_urls.json` (dato local, no se publica
+en GitHub). Las corridas sólo leen ese archivo, por lo que se puede revisar
+también mientras corre el monitoreo. Ver
+`docs/adr/0009-revision-de-urls-sin-cambios.md`.
 
 ## Cancelación y fuentes no verificadas
 
