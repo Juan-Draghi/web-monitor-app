@@ -9,9 +9,11 @@ echo   MonitoreoWeb CPAU - Compilacion
 echo  ==============================================
 echo.
 
-:: Cerrar la app si esta corriendo (evita errores de archivo en uso)
+:: Cerrar la app si esta corriendo (evita errores de archivo en uso).
+:: Solo se cierra el node.exe que Playwright usa DENTRO de dist\MonitoreoWeb;
+:: los demas node.exe de la computadora (otras herramientas) no se tocan.
 taskkill /IM MonitoreoWeb.exe /F > nul 2>&1
-taskkill /IM node.exe /F > nul 2>&1
+powershell -NoProfile -Command "$dist = (Resolve-Path -LiteralPath '.').Path + '\dist\MonitoreoWeb\'; Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($dist, [StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force" > nul 2>&1
 timeout /t 1 /nobreak > nul
 
 :: Verificar entorno virtual
@@ -46,7 +48,9 @@ if errorlevel 1 (
 echo  [3/5] Compilando ejecutable (puede tardar 2-5 minutos)...
 echo        No cierres esta ventana.
 echo.
-venv\Scripts\python -m PyInstaller monitoreo.spec --noconfirm --clean
+:: La carpeta de trabajo temporal va fuera de OneDrive: dentro de OneDrive la
+:: limpieza (--clean) falla con "Acceso denegado" por la sincronizacion.
+venv\Scripts\python -m PyInstaller monitoreo.spec --noconfirm --clean --workpath "%TEMP%\monitoreo-pyi-build"
 if errorlevel 1 (
     echo.
     echo  ERROR en la compilacion. Revisa los mensajes anteriores.

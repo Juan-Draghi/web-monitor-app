@@ -6,6 +6,28 @@ origino, la solucion aplicada y las verificaciones realizadas.
 Para decisiones tecnicas con alternativas o consecuencias relevantes, crear
 ademas un ADR en `docs/adr/`.
 
+## 2026-11-15 - Correcciones de compilar.bat
+
+**Problema**
+
+`compilar.bat` cerraba a la fuerza todos los procesos `node.exe` de la
+computadora, incluidos los de otras herramientas, y la limpieza de PyInstaller
+(`--clean`) fallaba con "Acceso denegado" dentro de la carpeta sincronizada por
+OneDrive.
+
+**Cambio aplicado**
+
+- Solo se cierra el `node.exe` ubicado dentro de `dist\MonitoreoWeb`
+  (el que usa Playwright).
+- La carpeta de trabajo de PyInstaller pasa a `%TEMP%\monitoreo-pyi-build`.
+
+**Verificacion**
+
+- Ejecucion completa de `compilar.bat`: compilacion exitosa; los otros
+  `node.exe` en ejecucion (2) siguieron activos.
+- El ejecutable generado arranca y sirve la interfaz.
+- No se probo el cierre de un `node.exe` de la app en ejecucion.
+
 ## 2026-11-15 - Revision y clasificacion de URLs sin cambios
 
 **Problema**
