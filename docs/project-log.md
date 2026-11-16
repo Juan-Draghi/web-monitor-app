@@ -6,6 +6,39 @@ origino, la solucion aplicada y las verificaciones realizadas.
 Para decisiones tecnicas con alternativas o consecuencias relevantes, crear
 ademas un ADR en `docs/adr/`.
 
+## 2026-11-16 - INDEC: comparar el enlace al informe PDF
+
+**Problema**
+
+La pagina de INDEC (`.../indec/web/Nivel3-Tema-3-3`) carga su contenido con
+JavaScript. La lectura sin navegador solo obtenia menu y pie de pagina (mas de
+80 caracteres, por lo que no se usaba Playwright como respaldo). Se comparaba
+ese texto: un cambio de menu el 03/11 reinicio el plazo de 30 dias y el
+informe del ISAC del 06/11 no se detecto. Ningun mecanismo lo advirtio.
+
+**Cambio aplicado**
+
+- Para paginas de INDEC se lee la direccion interna equivalente
+  (`.../Nivel3/Tema/3/3`) y se compara el enlace "Ver Informe" al PDF.
+- Si el enlace no aparece, la fuente queda como error (no verificada) en lugar
+  de "Sin cambios".
+- Los resultados incluyen el campo `Documento` con el enlace al PDF (INDEC y
+  Zonaprop) y la interfaz muestra "Abrir informe PDF".
+
+**Motivo**
+
+Detectar informes nuevos, que es lo que interesa de esta fuente, sin depender
+de cambios de menu o cifras de portada.
+
+**Verificacion**
+
+- Auditoria de solo lectura de las 39 fuentes (lectura de la app frente a la
+  pagina completa en navegador): solo INDEC comparaba contenido no relevante.
+- `tests/test_indec.py`: conversion de direccion, lectura del enlace, error
+  si falta, ruido sin efecto e informe nuevo detectado.
+- Lectura real: devuelve `isac_11_26F4E69BED3F.pdf` (HTTP 200, PDF).
+- La primera corrida posterior mostrara INDEC como "Cambio detectado" una vez.
+
 ## 2026-11-15 - Correcciones de compilar.bat
 
 **Problema**

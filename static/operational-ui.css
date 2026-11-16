@@ -633,6 +633,13 @@ h1 {
   white-space: nowrap;
 }
 
+.document-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .error-detail,
 .result-meta {
   display: block;

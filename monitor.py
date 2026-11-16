@@ -400,6 +400,66 @@ def is_gdrive_folder(url):
     return 'drive.google.com/drive/folders/' in url
 
 
+# ---------------------------------------------------------------------------
+# INDEC: comparar el enlace al informe PDF
+# ---------------------------------------------------------------------------
+# Las páginas de INDEC (".../indec/web/Nivel3-Tema-3-3") cargan su contenido con
+# JavaScript desde una dirección interna (".../Nivel3/Tema/3/3"). Sin navegador
+# sólo se ve el menú, que no sirve para detectar informes nuevos. Se lee esa
+# dirección interna y se compara el enlace «Ver Informe»: cada informe nuevo
+# tiene otro nombre de archivo. Si el enlace no aparece, la fuente queda como
+# error (no verificada) en lugar de pasar como «Sin cambios».
+
+INDEC_PAGE_MARKER = 'indec.gob.ar/indec/web/'
+
+
+def is_indec_page(url):
+    return INDEC_PAGE_MARKER in url
+
+
+def indec_data_url(url):
+    """Convierte .../indec/web/Nivel3-Tema-3-3 en .../Nivel3/Tema/3/3."""
+    segment = url.split(INDEC_PAGE_MARKER, 1)[1].split('?', 1)[0].split('#', 1)[0].strip('/')
+    return 'https://www.indec.gob.ar/' + '/'.join(segment.split('-'))
+
+
+def fetch_indec_report_pdf(url, session):
+    """Devuelve (url_del_pdf, error) del informe vigente en una página de INDEC."""
+    from urllib.parse import urljoin
+
+    data_url = indec_data_url(url)
+    try:
+        response = session.get(data_url, timeout=REQUEST_TIMEOUT)
+    except Exception as exc:
+        return None, f'INDEC: no se pudo leer {data_url}: {exc}'
+    if response.status_code != 200:
+        return None, f'INDEC: HTTP {response.status_code} en {data_url}'
+
+    soup = BeautifulSoup(response.text, 'html.parser')
+    candidates = []
+    for link in soup.find_all('a', href=True):
+        href = link['href'].strip()
+        if '.pdf' not in href.lower():
+            continue
+        text = link.get_text(' ', strip=True).lower()
+        score = 2 if 'informe' in text else 0
+        if 'informesdeprensa' in href.lower():
+            score += 1
+        candidates.append((score, urljoin(data_url, href)))
+    if not candidates:
+        return None, 'INDEC: no se encontró el enlace al informe PDF (la página pudo cambiar)'
+    # Ante empate se conserva el primero de la página (el informe más reciente).
+    best_score = max(score for score, _ in candidates)
+    return next(link for score, link in candidates if score == best_score), ''
+
+
+def document_url_from_content(text):
+    """Enlace al documento (PDF) cuando la fuente se compara por su enlace."""
+    if text and text.startswith('PDF_URL: '):
+        return text[len('PDF_URL: '):].strip()
+    return ''
+
+
 def get_zonaprop_pdf_pattern(url):
     for key, pattern in ZONAPROP_PDF_PATTERNS.items():
         if key in url:
@@ -676,6 +736,14 @@ async def fetch_url(session, url, browser=None):
             return url, 'Success', f'PDF_URL: {pdf_url}', ''
         return url, 'Error', '', 'No se encontró PDF en la página'
 
+    # INDEC: compara el enlace al informe PDF (ver fetch_indec_report_pdf)
+    if is_indec_page(url):
+        loop = asyncio.get_running_loop()
+        pdf_url, error = await loop.run_in_executor(None, fetch_indec_report_pdf, url, session)
+        if pdf_url:
+            return url, 'Success', f'PDF_URL: {pdf_url}', ''
+        return url, 'Error', '', error
+
     # Google Drive: usa Playwright para renderizar el listado de archivos
     if is_gdrive_folder(url):
         return await fetch_gdrive_folder_playwright(browser, url)
@@ -881,6 +949,8 @@ def run_monitor(
             'Estado': status,
             'Resultado': 'Sin cambios',
             'Error': error_msg if status == 'Error' else '',
+            # Enlace directo al informe PDF (INDEC, Zonaprop); vacío en el resto.
+            'Documento': document_url_from_content(text) if status == 'Success' else '',
         }
         if status == 'Success':
             current_hash = calculate_hash(clean_text(text))

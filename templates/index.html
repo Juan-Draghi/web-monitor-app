@@ -536,7 +536,12 @@
         const error = showError && item.Error
           ? '<span class="error-detail">' + escHtml(item.Error) + '</span>'
           : '';
-        return resultItemHtml(url, error, actionLabel);
+        // Fuentes que se comparan por su informe PDF (INDEC, Zonaprop).
+        const documentLink = item.Documento
+          ? '<a class="document-link" href="' + escAttr(safeExternalUrl(item.Documento))
+            + '" target="_blank" rel="noopener noreferrer">Abrir informe PDF ↗</a>'
+          : '';
+        return resultItemHtml(url, error + documentLink, actionLabel);
       }).join('');
     }
 
