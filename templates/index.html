@@ -3,20 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Selección Informativa — Monitor web</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='operational-ui.css') }}">
+  <title>Monitor web · Biblioteca CPAU</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='cpau-ui.css') }}">
 </head>
 <body>
   <header class="topbar">
     <div class="ui-shell topbar__inner">
-      <div class="product" aria-label="Monitor web">
-        <span class="product__mark" aria-hidden="true">M</span>
-        <span>
+      <div class="product">
+        <img class="product__logo" src="{{ url_for('static', filename='logo-biblioteca.png') }}" alt="Biblioteca CPAU">
+        <span class="product__divider" aria-hidden="true"></span>
+        <span class="product__text">
           <span class="product__name">Monitor web</span>
           <span class="product__context">Selección informativa</span>
         </span>
       </div>
-      <span class="app-label">Herramienta de uso interno</span>
+      <span class="app-label">Aplicación local</span>
     </div>
   </header>
 
@@ -116,7 +118,7 @@
         <div>
           <p class="section-kicker">Resultados</p>
           <h2 id="results-title">Novedades que requieren atención</h2>
-          <p>Los cambios aparecen primero; las excepciones y estados secundarios quedan agrupados a la derecha.</p>
+          <p>Los cambios aparecen primero. Debajo están las revisiones pendientes y los estados secundarios.</p>
         </div>
         <span class="updated" id="updated-summary">Sin resultados cargados</span>
       </div>
@@ -250,6 +252,13 @@
       </div>
     </section>
   </main>
+
+  <footer class="app-footer">
+    <div class="ui-shell app-footer__inner">
+      <span>Biblioteca CPAU · Monitor web</span>
+      <span>Aplicación local</span>
+    </div>
+  </footer>
 
   <script>
     let pollTimer = null;

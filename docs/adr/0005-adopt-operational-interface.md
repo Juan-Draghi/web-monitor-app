@@ -2,7 +2,7 @@
 
 ## Estado
 
-Aceptado
+Reemplazado por `0010-adoptar-estilo-cpau.md` (2026-11-16).
 
 ## Fecha
 

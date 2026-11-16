@@ -6,6 +6,38 @@ origino, la solucion aplicada y las verificaciones realizadas.
 Para decisiones tecnicas con alternativas o consecuencias relevantes, crear
 ademas un ADR en `docs/adr/`.
 
+## 2026-11-16 - Estilo Biblioteca CPAU y resultados en una columna
+
+**Problema**
+
+La interfaz usaba un sistema visual neutro y los cuadros secundarios de
+resultados quedaban en una columna lateral angosta, donde los botones de
+revision no entraban en una fila.
+
+**Cambio aplicado**
+
+- `static/cpau-ui.css` reemplaza a `static/operational-ui.css` con la
+  identidad Biblioteca CPAU (paleta, Roboto, estetica plana).
+- Logo y favicon CPAU, barra superior y pie nuevos.
+- Resultados en una sola columna, a todo el ancho, sin desplazamiento interno.
+- `CLAUDE.md` y README actualizados.
+
+**Motivo**
+
+Pedido de la persona usuaria: identidad institucional y mas espacio para los
+botones de los resultados.
+
+**Verificacion**
+
+- Prototipo con copia de datos reales aprobado antes de aplicarlo.
+- Capturas a 1366 px y 390 px, sin desplazamiento horizontal ni errores de
+  consola.
+- Pruebas automaticas y verificacion del ejecutable recompilado.
+
+**ADR relacionado**
+
+- `docs/adr/0010-adoptar-estilo-cpau.md` (reemplaza al ADR 0005)
+
 ## 2026-11-16 - INDEC: comparar el enlace al informe PDF
 
 **Problema**

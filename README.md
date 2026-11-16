@@ -40,12 +40,12 @@ Inicia el servidor Flask directamente desde el entorno virtual. Útil para modif
 
 ## Interfaz
 
-La aplicación corre en `http://localhost:5000` y utiliza una interfaz operativa neutra, sin fuentes ni recursos visuales externos. La pantalla organiza el trabajo en cuatro niveles:
+La aplicación corre en `http://localhost:5000` y usa la identidad visual de la Biblioteca CPAU (logo, paleta y Roboto), sin recursos externos: funciona sin conexión. La pantalla organiza el trabajo en cuatro niveles:
 
 - **Ejecución**: fecha de la última corrida, estado del navegador dinámico, botón principal y progreso.
 - **Resumen**: total de fuentes, cambios, altas iniciales, revisiones manuales y errores.
-- **Resultados**: cambios detectados como contenido prioritario y estados secundarios plegables.
-- **Fuentes monitoreadas**: panel cerrado por defecto para agregar, editar, eliminar y guardar URLs.
+- **Resultados**: cuadros uno debajo del otro, a todo el ancho. Primero los cambios detectados; debajo, la revisión por antigüedad, las URLs a revisar, los sitios inactivos o caídos, el primer rastreo y las fuentes no verificadas.
+- **Fuentes monitoreadas**: panel cerrado por defecto para agregar, modificar o dar de baja fuentes, con su motivo.
 
 El diseño se adapta a pantallas de escritorio, tablet y móvil sin desplazamiento horizontal.
 
@@ -60,7 +60,7 @@ El diseño se adapta a pantallas de escritorio, tablet y móvil sin desplazamien
 | `revisiones.py` | Revisión manual de URLs sin cambios y su clasificación |
 | `app.py` | Servidor Flask y manejo de estado |
 | `templates/index.html` | Estructura y comportamiento de la interfaz web |
-| `static/operational-ui.css` | Sistema visual neutro y reglas responsive |
+| `static/cpau-ui.css` | Estilo Biblioteca CPAU y reglas responsive |
 | `monitoreo.spec` | Configuración de compilación PyInstaller |
 | `instalar.bat` | Instalación de dependencias |
 | `compilar.bat` | Generación del ejecutable `.exe` |

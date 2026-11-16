@@ -9,7 +9,9 @@ Codex y Claude Code. Editar las reglas allí, no en este archivo.
 
 - Aplicación: Flask local en `http://localhost:5000`. Servidor en `app.py`,
   lógica de monitoreo en `monitor.py`, interfaz en `templates/index.html` y
-  `static/operational-ui.css`.
+  `static/cpau-ui.css`.
+- Estilo de la interfaz: identidad Biblioteca CPAU (skill `cpau-estilo`,
+  ADR 0010). No usar el sistema neutro de `disenar-interfaces-operativas`.
 - Entorno virtual: `venv\` (lo crea `instalar.bat`). Usar siempre
   `venv\Scripts\python`, no el Python del sistema.
 - Pruebas: `venv\Scripts\python -m unittest discover tests`
